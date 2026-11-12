@@ -100,6 +100,8 @@ Then open **http://localhost:8000/tester.html** in Chrome and allow the micropho
 
 **Easiest start:** press **Quick start** on the website. It speaks each instruction, records by itself, checks the result and starts listening, so after that one click nothing else needs pressing. One sound (a lip pop) plus a few seconds of everyday noise is enough, and **one-sound mode** lets that single sound reach every action by picking from options that light up in turn. Next time, "Welcome back" skips setup entirely.
 
+**Better hearing:** a "Tune to this room" button (run automatically by Quick start) listens to the quiet room for 2 seconds and to a few of your sounds, then sets the sensitivity between them. You can pick which microphone to use, with a warning for Bluetooth mics, which lower audio quality. A 4th-order 150 Hz high-pass filter removes hum and desk bumps; on a test recording with both added, false triggers fell from 6 to 1 while all 39 real sounds were still found. The website's classifier also trains on slightly shifted copies and copies mixed with your own room noise (recognition of noisy, jittered test sounds rose from 52% to 74%), and ignores sounds that don't resemble any you recorded.
+
 The website uses a quick nearest-neighbour classifier so it learns instantly. The real model is the CNN in `train.py`.
 
 ## Quick start (Python)

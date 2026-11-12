@@ -206,7 +206,12 @@ footer p { margin: 0 0 8px; font-size: 14px; color: var(--muted); }
 .mictext { flex: 1; min-width: 0; font-size: 14px; }
 .mictext.bad { color: var(--rec); }
 .miclevel { flex: none; width: 90px; height: 8px; border-radius: 99px; background: var(--sunken); overflow: hidden; }
+.miclevel { position: relative; }
 .miclevel i { display: block; height: 100%; width: 0%; background: var(--accent); transition: width 60ms linear; }
+.miclevel b { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--warn); left: 0; }
+.micbar { flex-wrap: wrap; }
+.micpick { display: inline-flex; gap: 6px; align-items: center; }
+.micpick select { max-width: 200px; font-size: 13px; padding: 4px 8px; }
 .stage { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 20px; }
 .chips-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
 .schip { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 99px; font-weight: 500; font-size: 14px; }
@@ -488,7 +493,9 @@ body.bigtext { zoom: 1.2; }
     <div class="micbar" role="status" aria-live="polite">
       <span class="micdot" id="micDot" aria-hidden="true"></span>
       <span class="mictext" id="status">The microphone turns on when you press Record.</span>
-      <span class="miclevel" aria-hidden="true"><i id="lvl"></i></span>
+      <span class="miclevel" aria-hidden="true"><i id="lvl"></i><b id="floorMark"></b></span>
+      <span class="micpick" id="micPick" hidden><label class="label" for="micSelect">Mic</label><select id="micSelect"></select></span>
+      <button class="small" id="calBtn" title="Listens to the room and your sounds, then sets sensitivity">Tune to this room</button>
     </div>
     <div class="note" id="secureNote" hidden>The microphone can't be used when this page is opened straight from Finder. In Terminal, go to the project folder and run <code>python3 -m http.server 8000</code>, then open <code>http://localhost:8000/tester.html</code> in Chrome.</div>
 
@@ -752,7 +759,7 @@ class OnsetDetector {
     for (let m = 0; m < 24; m++) { let s = 0; const row = FB24[m]; for (let k = 0; k < row.length; k++) s += row[k] * p[k]; mel[m] = Math.log1p(100 * s); }
     let flux = 0;
     if (this.prev) for (let m = 0; m < 24; m++) flux += Math.max(0, mel[m] - this.prev[m]);
-    this.prev = mel;
+    this.prev = mel; this.lastFlux = flux;
     let sq = 0; for (let i = 0; i < n; i++) sq += block[i] * block[i];
     const rms = Math.sqrt(sq / n) + 1e-9; this.lastRms = rms;
     const hist = this.fluxHist.length ? this.fluxHist : [flux];
@@ -768,7 +775,8 @@ class OnsetDetector {
 
 // k-nearest-neighbours on standardised log-mel features. A quick stand-in for the CNN in train.py.
 class KNN {
-  constructor(items) {               // items: [{feat, label}]
+  // items: [{feat, label, src, aug}] -- src groups a clip with its shifted copies; aug copies are never tested.
+  constructor(items) {
     this.items = items; const d = NFEAT, n = items.length;
     this.mean = new Float32Array(d); this.std = new Float32Array(d);
     for (const it of items) for (let j = 0; j < d; j++) this.mean[j] += it.feat[j] / n;
@@ -776,23 +784,27 @@ class KNN {
     for (let j = 0; j < d; j++) this.std[j] = Math.sqrt(this.std[j]) + 1e-5;
     this.X = items.map(it => this.norm(it.feat));
     this.k = Math.max(1, Math.min(5, n - 1));
+    // Novelty bar: how far a real example usually is from its nearest other example.
+    // A sound much further than that from everything recorded is "none of your sounds".
+    const nn = [];
+    items.forEach((it, i) => { if (it.aug) return; let best = Infinity; for (let j = 0; j < n; j++) { if (items[j].src === it.src) continue; const dd = this.dist2(this.X[i], this.X[j]); if (dd < best) best = dd; } if (best < Infinity) nn.push(Math.sqrt(best)); });
+    nn.sort((x, y) => x - y);
+    this.novelBar = nn.length ? nn[Math.min(nn.length - 1, Math.floor(nn.length * 0.95))] * 1.8 : Infinity;
   }
+  dist2(a, b) { let s = 0; for (let j = 0; j < NFEAT; j++) { const t = a[j] - b[j]; s += t * t; } return s; }
   norm(f) { const z = new Float32Array(NFEAT); for (let j = 0; j < NFEAT; j++) z[j] = (f[j] - this.mean[j]) / this.std[j]; return z; }
-  predictNorm(z, skip = -1) {
+  predictNorm(z, skipSrc) {
     const ds = [];
-    for (let i = 0; i < this.X.length; i++) {
-      if (i === skip) continue;
-      let s = 0; const x = this.X[i]; for (let j = 0; j < NFEAT; j++) { const t = x[j] - z[j]; s += t * t; }
-      ds.push([s, this.items[i].label]);
-    }
+    for (let i = 0; i < this.X.length; i++) { if (skipSrc !== undefined && this.items[i].src === skipSrc) continue; ds.push([this.dist2(this.X[i], z), this.items[i].label]); }
     ds.sort((a, b) => a[0] - b[0]);
     const votes = {}, k = Math.min(this.k, ds.length);
     for (let i = 0; i < k; i++) votes[ds[i][1]] = (votes[ds[i][1]] || 0) + 1;
     let best = null, bv = -1; for (const [l, v] of Object.entries(votes)) if (v > bv) { best = l; bv = v; }
-    return { label: best, conf: bv / k };
+    const dist = Math.sqrt(ds[0][0]);
+    return { label: best, conf: bv / k, dist, novel: dist > this.novelBar };
   }
   predict(feat) { return this.predictNorm(this.norm(feat)); }
-  leaveOneOut() { return this.X.map((z, i) => ({ truth: this.items[i].label, ...this.predictNorm(z, i) })); }
+  leaveOneOut() { const out = []; this.X.forEach((z, i) => { const it = this.items[i]; if (!it.aug) out.push({ truth: it.label, ...this.predictNorm(z, it.src) }); }); return out; }
 }
 // ===== CORE END =====
 
@@ -904,15 +916,23 @@ async function startMic() {
   try {
     setStatus("Allow the microphone when your browser asks.");
     await ensureCtx();
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1 } });
-    const src = ctx.createMediaStreamSource(stream), lp = ctx.createBiquadFilter(), proc = ctx.createScriptProcessor(1024, 1, 1), mute = ctx.createGain();
-    lp.type = "lowpass"; lp.frequency.value = 7000; mute.gain.value = 0;
+    const audio = { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1 };
+    if (micDeviceId) audio.deviceId = { exact: micDeviceId };
+    const stream = await navigator.mediaDevices.getUserMedia({ audio });
+    const src = ctx.createMediaStreamSource(stream), hp = ctx.createBiquadFilter(), hp2 = ctx.createBiquadFilter(), lp = ctx.createBiquadFilter(), proc = ctx.createScriptProcessor(1024, 1, 1), mute = ctx.createGain();
+    // 4th-order Butterworth high-pass at 150 Hz (two biquads): removes rumble, mains hum and desk bumps
+    hp.type = hp2.type = "highpass"; hp.frequency.value = hp2.frequency.value = 150; hp.Q.value = 0.5412; hp2.Q.value = 1.3066;
+    lp.type = "lowpass"; lp.frequency.value = 7000;    // anti-aliasing before 16 kHz
+    mute.gain.value = 0;
     const rs = new Resampler(ctx.sampleRate, onBlock);
     proc.onaudioprocess = e => rs.push(e.inputBuffer.getChannelData(0));
-    src.connect(lp).connect(proc).connect(mute).connect(ctx.destination);
-    window._keep = { stream, proc };
+    src.connect(hp).connect(hp2).connect(lp).connect(proc).connect(mute).connect(ctx.destination);
+    window._keep = { stream, proc, src };
     micOn = true; setMicDot("on");
-    setStatus("Microphone is on. Nothing leaves this computer.");
+    const label = (stream.getAudioTracks()[0] || {}).label || "";
+    if (/airpods|bluetooth|hands-?free|headset|buds/i.test(label)) setStatus(`Using “${label}”. Bluetooth mics lower the sound quality. For best results pick the computer’s built-in microphone below.`, true);
+    else setStatus(`Microphone on${label ? ": " + label : ""}. Nothing leaves this computer.`);
+    fillMicList();
     return true;
   } catch (e) {
     if (e && e.name === "NotAllowedError") setStatus("Microphone access was blocked. Click the icon in the address bar to allow it, then reload the page.", true);
@@ -920,6 +940,51 @@ async function startMic() {
     return false;
   }
 }
+let micDeviceId = null;
+try { micDeviceId = localStorage.getItem("alch-mic") || null; } catch (e) { }
+async function fillMicList() {
+  try {
+    const devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === "audioinput");
+    const cur = window._keep && window._keep.stream.getAudioTracks()[0], curId = cur && cur.getSettings ? cur.getSettings().deviceId : null;
+    $("micSelect").innerHTML = devs.map((d, i) => `<option value="${d.deviceId}"${d.deviceId === curId ? " selected" : ""}>${(d.label || "Microphone " + (i + 1)).replace(/</g, "&lt;")}</option>`).join("");
+    $("micPick").hidden = devs.length < 2;
+  } catch (e) { }
+}
+async function switchMic(id) {
+  micDeviceId = id; try { localStorage.setItem("alch-mic", id); } catch (e) { }
+  if (window._keep) { window._keep.stream.getTracks().forEach(t => t.stop()); try { window._keep.src.disconnect(); } catch (e) { } }
+  micOn = false; det = new OnsetDetector(det.sensitivity);
+  await startMic();
+}
+
+// Room calibration: listen to the quiet room, then to a few of the user's sounds, and set sensitivity between them.
+let calibrating = null;
+async function calibrate(spoken) {
+  if (!(await startMic())) return false;
+  const prevMode = mode; mode = "cal"; const btn = $("calBtn"); btn.disabled = true;
+  const listen = ms => new Promise(r => { calibrating = { flux: [], rms: [] }; setTimeout(() => { const c = calibrating; calibrating = null; r(c); }, ms); });
+  const tell = async t => { setStatus(t); if (spoken) await say(t); };
+  await tell("Tuning to this room. Please stay quiet for two seconds.");
+  const quiet = await listen(2000);
+  await tell("Now make your lip pop, or any of your sounds, four or five times.");
+  const loud = await listen(4500);
+  mode = prevMode === "cal" ? "idle" : prevMode; btn.disabled = false;
+  const med = a => { const t = [...a].sort((x, y) => x - y); return t.length ? t[Math.floor(t.length / 2)] : 0; };
+  const q90 = a => { const t = [...a].sort((x, y) => x - y); return t.length ? t[Math.floor(t.length * 0.9)] : 0; };
+  const base = 2 * med(quiet.flux) + 2, quietTop = q90(quiet.flux), noiseRms = med(quiet.rms);   // 90th percentile: a stray cough during the quiet part doesn't spoil it
+  const peaks = []; for (let i = 0; i < loud.flux.length; i += 16) { const w = loud.flux.slice(i, i + 16); const m = Math.max(...w); if (m > Math.max(quietTop, base) * 1.2) peaks.push(m); }
+  peaks.sort((x, y) => x - y);
+  let msg;
+  if (peaks.length < 2) { msg = "I couldn't hear your sounds clearly. Try a little closer to the microphone, then tune again."; }
+  else {
+    const p = peaks[Math.floor(peaks.length * 0.3)], sens = Math.max(0.5, Math.min(2.5, base / (0.45 * p)));
+    det.sensitivity = sens; $("sens").value = sens.toFixed(1); $("sensVal").textContent = sens.toFixed(1);
+    msg = noiseRms > 0.02 ? "Tuned, but it's quite noisy here. A quieter spot or headphones will help." : "Tuned to this room. Your sounds come through clearly.";
+  }
+  setStatus(msg, peaks.length < 2); if (spoken) await say(msg);
+  return peaks.length >= 2;
+}
+
 function setStatus(t, bad = false) { const s = $("status"); s.textContent = t; s.classList.toggle("bad", bad); }
 function setMicDot(state) { const d = $("micDot"); d.className = "micdot" + (state ? " " + state : ""); }
 
@@ -929,6 +994,7 @@ function onBlock(block) {
   writeRing(block, start);
   const o = det.process(block);
   const end = det.seen;
+  if (calibrating) { calibrating.flux.push(det.lastFlux || 0); calibrating.rms.push(det.lastRms); }
   if (o !== null) {
     const m = { t: o, cls: null }; markers.push(m);
     if (mode === "rec" || mode === "control" || mode === "music") pending.push({ o, m });
@@ -956,14 +1022,15 @@ function handleHit(clip, p, end) {
   const latency = (end - p.o) / SR * 1000 + ms;
   let did = "", acted = false;
   if (mode === "music") {
-    acted = r.label !== "noise" && r.conf >= thrMusic && !!SOUND_MAP[r.label];
+    acted = r.label !== "noise" && !r.novel && r.conf >= thrMusic && !!SOUND_MAP[r.label];
     if (acted) { playSound(SOUND_MAP[r.label], 0.5 + 0.5 * r.conf); did = DRUM_NAMES[SOUND_MAP[r.label]]; flash(`.drum[data-c="${r.label}"]`); }
-    else did = r.label === "noise" ? "Ignored: everyday noise" : "Ignored: not sure enough";
+    else did = r.label === "noise" ? "Ignored: everyday noise" : r.novel ? "Ignored: didn\u2019t sound like your sounds" : "Ignored: not sure enough";
   } else {
     const action = scanOn ? (SCAN[scanIdx] || "none") : (actionMap[r.label] || "none"), now = performance.now();
     const speaking = window.speechSynthesis && speechSynthesis.speaking;
     let why = "";
     if (r.label === "noise") why = "Ignored: everyday noise";
+    else if (r.novel) why = "Ignored: didn\u2019t sound like your sounds";
     else if (r.conf < thrCtl) why = "Ignored: not sure enough";
     else if (action === "none") why = "Nothing set for this sound";
     else if (now - lastActionAt < 250) why = "Ignored: too soon after the last one";
@@ -1096,17 +1163,37 @@ $("nextSoundBtn").addEventListener("click", nextSound);
 function nextSound() { if (soundIdx < ORDER.length - 1) { soundIdx++; renderTeach(); } else goStep("check"); }
 
 // --- Training + Step 2: Check ---
+function mixNoise(c, nz, amount) {
+  let pc = 0, pn = 0; for (const v of c) pc = Math.max(pc, Math.abs(v)); for (const v of nz) pn = Math.max(pn, Math.abs(v));
+  const g = pn > 1e-6 ? pc / pn * amount : 0, o = new Float32Array(c.length);
+  for (let i = 0; i < c.length; i++) o[i] = c[i] + (nz[i] || 0) * g;
+  return o;
+}
+function shiftClip(c, k) { const o = new Float32Array(c.length); for (let i = 0; i < c.length; i++) { const j = i - k; if (j >= 0 && j < c.length) o[i] = c[j]; } return o; }
 let lastResults = null;
 function retrain() {
   const items = [];
-  for (const c of CLASSES) for (const x of data[c]) items.push({ feat: x.feat || (x.feat = clipFeatures(x.clip)), label: c });
+  let src = 0;
   const usable = CLASSES.filter(c => data[c].length >= 3);
-  $("exportBtn").disabled = items.length === 0;
+  const noiseClips = data.noise.slice(0, 200).map(x => x.clip);
+  for (const c of usable) for (const x of data[c]) {
+    if (!x.feat) x.feat = clipFeatures(x.clip);
+    if (!x.shifted) x.shifted = [shiftClip(x.clip, 80), shiftClip(x.clip, -80)].map(clipFeatures);   // +-5 ms: onset timing varies
+    items.push({ feat: x.feat, label: c, src });
+    for (const f of x.shifted) items.push({ feat: f, label: c, src, aug: true });
+    // One copy mixed with the user's own recorded room noise: the biggest single gain in noisy rooms
+    if (c !== "noise" && noiseClips.length) {
+      if (!x.noisy) x.noisy = clipFeatures(mixNoise(x.clip, noiseClips[(src * 7919) % noiseClips.length], 0.1 + 0.3 * ((src * 0.618) % 1)));
+      items.push({ feat: x.noisy, label: c, src, aug: true });
+    }
+    src++;
+  }
+  $("exportBtn").disabled = !CLASSES.some(c => data[c].length);
   const ready = usable.length >= 2 && usable.some(c => c !== "noise");
   $("toUseBtn").disabled = !ready;
   $("go-teach").classList.toggle("done", ready);
   if (!ready) { model = null; lastResults = null; return; }
-  model = new KNN(items.filter(it => usable.includes(it.label)));
+  model = new KNN(items);
   const res = model.leaveOneOut();
   lastResults = { usable, res, acc: res.filter(r => r.truth === r.label).length / res.length };
   $("go-check").classList.toggle("done", lastResults.acc >= 0.85);
@@ -1191,7 +1278,7 @@ $("mapRows").addEventListener("change", e => { const c = e.target.dataset.c; if 
 // --- Drawing ---
 function fitCanvas(cv) { const r = cv.getBoundingClientRect(), d = window.devicePixelRatio || 1; if (r.width && cv.width !== Math.round(r.width * d)) { cv.width = Math.round(r.width * d); cv.height = Math.round(r.height * d); } return d; }
 function draw() {
-  if (micOn) $("lvl").style.width = Math.min(100, Math.max(0, (20 * Math.log10(det.lastRms) + 60) / 60 * 100)) + "%";
+  if (micOn) { $("lvl").style.width = Math.min(100, Math.max(0, (20 * Math.log10(det.lastRms) + 60) / 60 * 100)) + "%"; $("floorMark").style.left = Math.min(100, Math.max(0, (20 * Math.log10(det.noise * 4) + 60) / 60 * 100)) + "%"; }
   const cv = $("scope");
   if (cv.getBoundingClientRect().width) {
     const d = fitCanvas(cv), g = cv.getContext("2d"), W = cv.width, H = cv.height;
@@ -1283,6 +1370,9 @@ async function runGuide(list) {
   $("guideStep").textContent = "Guided setup";
   await say("Hello. I'll guide you. First, please allow the microphone if your browser asks.");
   if (!(await startMic())) { endGuide("The microphone isn't available. See the message above."); return; }
+  $("guideStep").textContent = "Tuning to your room";
+  await calibrate(true);
+  if (guideAbort) { endGuide(); return; }
   for (let i = 0; i < list.length && !guideAbort; i++) {
     const c = list[i], S = SOUNDS[c];
     soundIdx = ORDER.indexOf(c); renderTeach();
@@ -1368,6 +1458,9 @@ $("scanToggle").addEventListener("change", () => {
   clearInterval(scanTimer); if (scanOn) scanTimer = setInterval(scanTick, 1600);
   if (mode === "control") startListening();
 });
+
+$("calBtn").addEventListener("click", () => { if (mode === "rec" || mode === "countdown" || guideOn) return; calibrate(false); });
+$("micSelect").addEventListener("change", e => switchMic(e.target.value));
 
 // Keyboard shortcuts for a helper
 document.addEventListener("keydown", e => {

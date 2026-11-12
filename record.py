@@ -22,6 +22,7 @@ import numpy as np
 
 from alchemist import config as C
 from alchemist.dataset import read_wav, write_wav
+from alchemist.features import highpass
 from alchemist.onset import detect_onsets, slice_clips
 
 
@@ -57,6 +58,7 @@ def main():
         print(f"\n  Sound: {args.label}. {C.DESCRIPTIONS.get(args.label, '')}")
         print("  Repeat it with short gaps until recording stops.")
     y = read_wav(args.file) if args.file else record(args.seconds)
+    y = highpass(y)                                       # same rumble filter as live use
 
     raw = Path(args.data, "raw", f"{args.label}__{session}.wav")
     write_wav(raw, y)                                     # keep the full take for later

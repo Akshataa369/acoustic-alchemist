@@ -4,6 +4,7 @@ No librosa dependency: it keeps the live path fast and means every step of the
 pipeline is ours to explain to the jury.
 """
 import numpy as np
+from scipy.signal import butter, sosfilt, sosfilt_zi
 
 from . import config as C
 
@@ -73,3 +74,26 @@ def clip_features(y):
 
 
 N_FRAMES = log_mel(np.zeros(C.CLIP_SAMPLES)).shape[1]
+
+
+# 4th-order 150 Hz high-pass before onset detection: removes rumble, mains hum and desk bumps.
+# On a test recording with hum and 25 desk bumps added, false triggers fell from 6 to 1 and
+# all 39 real sounds were still found (70 Hz, 2nd order did not help: 6 false).
+# The website applies the same filter (two cascaded biquads), so both see the same signal.
+_HP = butter(4, 150, btype="highpass", fs=C.SAMPLE_RATE, output="sos")
+
+
+def highpass(y):
+    """Filter a whole recording."""
+    return sosfilt(_HP, np.asarray(y, dtype=np.float64)).astype(np.float32)
+
+
+class StreamingHighpass:
+    """Filter block by block, keeping state between blocks (for live audio)."""
+
+    def __init__(self):
+        self.zi = sosfilt_zi(_HP) * 0.0
+
+    def __call__(self, block):
+        out, self.zi = sosfilt(_HP, np.asarray(block, dtype=np.float64), zi=self.zi)
+        return out.astype(np.float32)

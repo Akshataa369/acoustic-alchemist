@@ -12,6 +12,7 @@ import numpy as np
 
 from . import config as C
 from . import synth
+from .features import StreamingHighpass
 from .onset import OnsetDetector
 from .pitch import hz_to_midi, midi_to_hz, note_name, snap_to_scale, yin
 
@@ -124,6 +125,7 @@ class Engine:
         self.listening = True                    # control mode: paused/resumed by a sound
         self.last_action_t = -1e9
         self.onsets = OnsetDetector(sensitivity=sensitivity)
+        self.highpass = StreamingHighpass()
         self.buf = np.zeros(0, dtype=np.float32)
         self.buf_start = 0                       # absolute sample index of buf[0]
         self.pending = []                        # onset sample indices awaiting classification
@@ -135,7 +137,7 @@ class Engine:
 
     def process(self, block):
         """Feed one input block. Returns the events it produced."""
-        block = np.asarray(block, dtype=np.float32)
+        block = self.highpass(np.asarray(block, dtype=np.float32))
         self.buf = np.concatenate([self.buf, block])
         produced = []
 
