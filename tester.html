@@ -1,0 +1,1412 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Acoustic-Alchemist</title>
+<meta name="description" content="Control a computer with any sound you can make. A trainable, on-device sound controller for people that keyboards, mice and voice assistants leave out.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400;1,6..72,500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: the problem first (statement, facts, the gap, our answer), then the working tool:
+   a sticky monitor beside five steps, then sources. */
+:root {
+  --bg: #eef1f5;
+  --surface: #ffffff;
+  --sunken: #e4e8ee;
+  --ink: #141922;
+  --muted: #5a6474;
+  --line: #d3d9e2;
+  --accent: #0b7285;
+  --accent-ink: #ffffff;
+  --accent-soft: #d7eef2;
+  --rec: #d6336c;
+  --ok: #2b8a3e;
+  --warn: #b35c00;
+  --scope-bg: #10151d;
+  --scope-wave: #8fd3df;
+  --display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --body: "IBM Plex Sans", "Helvetica Neue", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  --c-pop: #e03131; --c-click: #ae3ec9; --c-hiss: #1098ad; --c-hum: #e67700; --c-tap: #4263eb; --c-noise: #868e96;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1218; --surface: #171d26; --sunken: #0b0f14; --ink: #e7ecf2; --muted: #95a1b2;
+    --line: #2a3340; --accent: #3bc9db; --accent-ink: #062a30; --accent-soft: #123a42; --rec: #f06595; --ok: #69db7c; --warn: #ffa94d;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1218; --surface: #171d26; --sunken: #0b0f14; --ink: #e7ecf2; --muted: #95a1b2;
+  --line: #2a3340; --accent: #3bc9db; --accent-ink: #062a30; --accent-soft: #123a42; --rec: #f06595; --ok: #69db7c; --warn: #ffa94d;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.6 var(--body); }
+a { color: var(--accent); }
+.wrap { max-width: 1240px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.topbar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px 20px; padding-block: 18px; border-bottom: 1px solid var(--line); }
+.brand { font: 800 20px/1 var(--display); letter-spacing: -0.01em; }
+.brand span { color: var(--accent); }
+.skip { font-size: 14px; }
+
+/* Problem */
+.hero { padding-block: 44px 28px; display: grid; gap: 18px; }
+.hero > * { max-width: 900px; }
+.eyebrow { font: 500 12px var(--mono); text-transform: uppercase; letter-spacing: 0.1em; color: var(--accent); }
+h1 { font: 800 clamp(30px, 5vw, 52px)/1.05 var(--display); letter-spacing: -0.025em; margin: 0; text-wrap: balance; }
+.lede { font-size: 18px; max-width: 64ch; margin: 0; color: var(--ink); }
+.lede.quiet { color: var(--muted); font-size: 16px; }
+.facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; padding-block: 8px 36px; }
+@media (max-width: 980px) { .facts { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .facts { grid-template-columns: minmax(0, 1fr); } }
+.fact { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 6px; align-content: start; }
+.fact strong { font: 800 32px/1 var(--display); letter-spacing: -0.02em; color: var(--accent); }
+.fact p { margin: 0; font-size: 14px; }
+.fact small { font: 400 12px var(--mono); color: var(--muted); }
+.band { background: var(--surface); border-block: 1px solid var(--line); }
+.band .wrap { padding-block: 36px; }
+h2.section { font: 800 clamp(22px, 3vw, 30px)/1.15 var(--display); letter-spacing: -0.015em; margin: 0 0 18px; text-wrap: balance; }
+.gap3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+@media (max-width: 820px) { .gap3 { grid-template-columns: minmax(0, 1fr); } }
+.gapcard { border-top: 3px solid var(--line); padding-top: 12px; }
+.gapcard h3 { font: 600 17px/1.3 var(--display); margin: 0 0 6px; }
+.gapcard p { margin: 0; color: var(--muted); font-size: 14.5px; }
+.answer { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 28px; align-items: start; }
+@media (max-width: 820px) { .answer { grid-template-columns: minmax(0, 1fr); } }
+.answer ul { margin: 0; padding-left: 20px; display: grid; gap: 8px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.chip { font-size: 13px; padding: 4px 11px; border-radius: 99px; background: var(--accent-soft); color: var(--ink); }
+.honest { font-size: 13.5px; color: var(--muted); margin-top: 14px; }
+
+/* Tool */
+.tool { padding-block: 40px 20px; }
+.tool-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: 12px 24px; margin-bottom: 18px; }
+.tool-head p { margin: 4px 0 0; color: var(--muted); max-width: 62ch; }
+.grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 20px; align-items: start; }
+@media (max-width: 900px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+.monitor { position: sticky; top: 12px; display: grid; gap: 14px; min-width: 0; }
+@media (max-width: 900px) { .monitor { position: static; } }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px; min-width: 0; }
+.steps { display: grid; gap: 16px; min-width: 0; }
+h3.step { font: 600 20px/1.2 var(--display); margin: 0; display: flex; align-items: baseline; gap: 10px; }
+h3.step .n { font: 500 12px var(--mono); color: var(--accent); border: 1px solid var(--accent); border-radius: 99px; padding: 1px 8px; }
+.why { font-size: 13.5px; color: var(--ink); background: var(--accent-soft); border-radius: 6px; padding: 8px 12px; margin: 10px 0 0; max-width: 68ch; }
+.why b { font-weight: 600; }
+.hint { color: var(--muted); font-size: 14px; margin: 8px 0 14px; max-width: 68ch; }
+.label { font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+button, select { font: 600 14px var(--body); border-radius: 7px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); padding: 8px 14px; cursor: pointer; }
+select { font-weight: 500; padding: 6px 10px; }
+button:hover:not(:disabled) { border-color: var(--accent); }
+button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button:disabled { opacity: 0.45; cursor: not-allowed; }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+button.rec { background: var(--rec); color: #fff; border-color: var(--rec); }
+button.small { padding: 4px 9px; font-size: 12.5px; }
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+input[type=text] { font: 400 14px var(--body); padding: 7px 10px; border-radius: 7px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); width: 150px; }
+
+.scope { background: var(--scope-bg); border-radius: 8px; overflow: hidden; position: relative; }
+.scope canvas { display: block; width: 100%; height: 150px; }
+.scope .tag { position: absolute; left: 10px; top: 8px; font: 500 11px var(--mono); color: #9fb0c3; letter-spacing: 0.06em; }
+.meter { height: 8px; background: var(--sunken); border-radius: 99px; overflow: hidden; position: relative; margin-top: 10px; }
+.meter i { position: absolute; inset: 0 auto 0 0; background: var(--accent); width: 0%; transition: width 60ms linear; }
+.meter b { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--warn); left: 0%; }
+.status { font: 400 13px var(--mono); color: var(--muted); margin-top: 8px; min-height: 1.4em; }
+.status.bad { color: var(--rec); }
+.readout { display: grid; grid-template-columns: minmax(0, 1fr) 120px; gap: 16px; align-items: center; }
+.big { font: 800 38px/1 var(--display); letter-spacing: -0.02em; }
+.big.dim { color: var(--muted); font-size: 22px; font-weight: 600; }
+.did { font: 500 14px var(--mono); color: var(--muted); margin-top: 6px; min-height: 1.4em; }
+.heat { background: var(--scope-bg); border-radius: 6px; padding: 6px; }
+.heat canvas { display: block; width: 100%; height: 90px; image-rendering: pixelated; }
+.kv { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+.kv div { background: var(--sunken); border-radius: 6px; padding: 8px 10px; }
+.kv strong { display: block; font: 500 18px var(--mono); font-variant-numeric: tabular-nums; }
+
+.pads { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
+.pad { border: 1px solid var(--line); border-radius: 9px; padding: 12px 12px 12px 16px; display: grid; gap: 6px; background: var(--surface); position: relative; overflow: hidden; transition: background 120ms; }
+.pad::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 4px; background: var(--c); }
+.pad .name { font: 600 16px var(--display); display: flex; justify-content: space-between; align-items: baseline; }
+.pad .count { font: 500 13px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.pad .count.ok { color: var(--ok); }
+.pad .how { font-size: 13px; color: var(--muted); min-height: 2.8em; }
+.pad .acts { display: flex; gap: 6px; flex-wrap: wrap; }
+.pad.flash { background: color-mix(in srgb, var(--c) 22%, var(--surface)); }
+.pad.recording { outline: 2px solid var(--rec); }
+.progress { height: 4px; background: var(--sunken); border-radius: 99px; overflow: hidden; }
+.progress i { display: block; height: 100%; width: 0%; background: var(--rec); }
+
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+th { font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); }
+td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.pill { display: inline-block; font: 500 12px var(--mono); padding: 1px 8px; border-radius: 99px; }
+.pill.good { background: color-mix(in srgb, var(--ok) 18%, transparent); color: var(--ok); }
+.pill.mid { background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--warn); }
+.pill.bad { background: color-mix(in srgb, var(--rec) 18%, transparent); color: var(--rec); }
+.dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--c); margin-right: 7px; }
+.scorebig { font: 800 34px/1 var(--display); }
+.tablewrap { overflow-x: auto; margin-top: 12px; }
+
+.tabs { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; margin: 6px 0 14px; }
+.tabs button { border: 0; border-radius: 0; padding: 8px 16px; }
+.tabs button[aria-selected="true"] { background: var(--accent); color: var(--accent-ink); }
+.listen { display: inline-flex; align-items: center; gap: 8px; font: 500 13px var(--mono); padding: 4px 12px; border-radius: 99px; background: color-mix(in srgb, var(--ok) 16%, transparent); color: var(--ok); }
+.listen::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.listen.paused { background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--warn); }
+.ctl { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 1100px) { .ctl { grid-template-columns: minmax(0, 1fr); } }
+.reader { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; display: grid; }
+.reader .card { padding: 20px; min-height: 200px; display: grid; gap: 10px; align-content: start; background: var(--sunken); transition: background 160ms; }
+.reader .card.bump { background: var(--accent-soft); }
+.reader .kicker { font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: 0.09em; color: var(--accent); }
+.reader h4 { font: 800 24px/1.15 var(--display); margin: 0; letter-spacing: -0.015em; text-wrap: balance; }
+.reader p { margin: 0; font-size: 15px; }
+.reader .src { font: 400 12px var(--mono); color: var(--muted); }
+.reader .bar { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--line); background: var(--surface); }
+.reader .pos { font: 500 13px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.slider { display: grid; gap: 4px; min-width: 200px; flex: 1; }
+.slider input { width: 100%; accent-color: var(--accent); }
+.log { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 4px; font: 400 13px var(--mono); max-height: 240px; overflow-y: auto; }
+.log li { display: grid; grid-template-columns: 64px minmax(0, 1fr) 44px minmax(0, 1.3fr); gap: 8px; align-items: center; padding: 3px 6px; border-radius: 4px; background: var(--sunken); font-variant-numeric: tabular-nums; }
+.log li.ignored { opacity: 0.55; }
+.log .barc { height: 6px; background: var(--line); border-radius: 99px; overflow: hidden; }
+.log .barc i { display: block; height: 100%; background: var(--c); }
+.log .act { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.note { border-left: 3px solid var(--warn); padding: 8px 12px; background: var(--sunken); border-radius: 0 6px 6px 0; font-size: 14px; margin-top: 12px; }
+code { font-family: var(--mono); font-size: 13px; }
+
+footer { border-top: 1px solid var(--line); margin-top: 40px; }
+footer .wrap { padding-block: 32px 48px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px; }
+@media (max-width: 820px) { footer .wrap { grid-template-columns: minmax(0, 1fr); } }
+footer h3 { font: 600 16px var(--display); margin: 0 0 8px; }
+footer ol { margin: 0; padding-left: 20px; font-size: 13.5px; display: grid; gap: 6px; }
+footer p { margin: 0 0 8px; font-size: 14px; color: var(--muted); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+/* ---- Guided tool ---- */
+.stepper { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; }
+.stepbtn { display: flex; gap: 12px; align-items: center; text-align: left; padding: 12px 14px; border-radius: 10px; background: var(--surface); border: 1px solid var(--line); }
+.stepbtn .num { flex: none; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font: 600 15px var(--display); background: var(--sunken); color: var(--muted); }
+.stepbtn b { display: block; font: 600 17px var(--display); }
+.stepbtn small { display: block; font-size: 13px; color: var(--muted); font-weight: 400; }
+.stepbtn[aria-current="step"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.stepbtn[aria-current="step"] .num { background: var(--accent); color: var(--accent-ink); }
+.stepbtn.done .num { background: var(--ok); color: #fff; }
+@media (max-width: 600px) { .stepbtn small { display: none; } .stepbtn { padding: 10px; gap: 8px; } }
+.micbar { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 10px; background: var(--surface); border: 1px solid var(--line); margin-bottom: 14px; }
+.micdot { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--line); }
+.micdot.on { background: var(--ok); }
+.micdot.rec { background: var(--rec); animation: blink 1s infinite; }
+@keyframes blink { 50% { opacity: 0.3; } }
+.mictext { flex: 1; min-width: 0; font-size: 14px; }
+.mictext.bad { color: var(--rec); }
+.miclevel { flex: none; width: 90px; height: 8px; border-radius: 99px; background: var(--sunken); overflow: hidden; }
+.miclevel i { display: block; height: 100%; width: 0%; background: var(--accent); transition: width 60ms linear; }
+.stage { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 20px; }
+.chips-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.schip { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 99px; font-weight: 500; font-size: 14px; }
+.schip .d { width: 10px; height: 10px; border-radius: 50%; background: var(--c); }
+.schip .n { font: 500 12px var(--mono); color: var(--muted); }
+.schip.ok .n { color: var(--ok); }
+.schip[aria-selected="true"] { border-color: var(--c); box-shadow: inset 0 0 0 1px var(--c); }
+.teachcard { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 24px; align-items: center; border-left: 6px solid var(--c); padding: 6px 0 6px 20px; }
+@media (max-width: 760px) { .teachcard { grid-template-columns: minmax(0, 1fr); } }
+.tc-count { font: 500 12px var(--mono); text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.tc-name { font: 800 clamp(26px, 4vw, 36px)/1.1 var(--display); margin: 4px 0 8px; letter-spacing: -0.015em; }
+.tc-how { font-size: 17px; margin: 0 0 6px; }
+.tc-tip { font-size: 14px; color: var(--muted); margin: 0 0 14px; }
+.tc-progress { height: 10px; border-radius: 99px; background: var(--sunken); overflow: hidden; }
+.tc-progress i { display: block; height: 100%; width: 0%; background: var(--c); transition: width 200ms; }
+.tc-have { font: 500 13px var(--mono); color: var(--muted); margin-top: 6px; }
+.tc-right { display: grid; justify-items: center; gap: 14px; text-align: center; }
+.recbig { width: 168px; height: 168px; border-radius: 50%; border: 0; background: var(--rec); color: #fff; font: 700 22px var(--display); display: grid; place-items: center; align-content: center; gap: 6px; box-shadow: 0 0 0 8px color-mix(in srgb, var(--rec) 18%, transparent); }
+.recbig:hover:not(:disabled) { filter: brightness(1.06); }
+.recbig .recdot { width: 18px; height: 18px; border-radius: 50%; background: #fff; }
+.recbig.counting, .recbig.recording { background: var(--ink); color: var(--bg); box-shadow: 0 0 0 8px color-mix(in srgb, var(--ink) 14%, transparent); }
+.recbig.counting .recdot, .recbig.recording .recdot { display: none; }
+.recbig.counting span:last-child { font-size: 56px; line-height: 1; }
+.dots { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; max-width: 250px; min-height: 14px; }
+.dots i { width: 14px; height: 14px; border-radius: 50%; background: var(--sunken); border: 1px solid var(--line); }
+.dots i.on { background: var(--c); border-color: var(--c); }
+.tc-feedback { font-size: 15px; min-height: 1.5em; max-width: 320px; }
+.tc-feedback.good { color: var(--ok); font-weight: 600; }
+.tc-feedback.warn { color: var(--warn); font-weight: 600; }
+.navrow { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
+.navrow .spacer { flex: 1; }
+button.big { font-size: 16px; padding: 12px 22px; border-radius: 9px; }
+button.ghost { background: transparent; }
+.checkhead { display: flex; gap: 18px; align-items: center; margin-bottom: 16px; }
+.ring { flex: none; width: 84px; height: 84px; border-radius: 50%; display: grid; place-items: center; font: 800 24px var(--display); background: conic-gradient(var(--accent) calc(var(--p, 0) * 1%), var(--sunken) 0); position: relative; }
+.ring::before { content: ""; position: absolute; inset: 9px; border-radius: 50%; background: var(--surface); }
+.ring span { position: relative; }
+.checklist { display: grid; gap: 8px; }
+.crow { display: grid; grid-template-columns: 110px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 12px; border-radius: 8px; background: var(--sunken); }
+@media (max-width: 600px) { .crow { grid-template-columns: minmax(0, 1fr) auto; } .crow .cbar { grid-column: 1 / -1; order: 3; } }
+.crow .cname { font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.crow .cname .d { width: 10px; height: 10px; border-radius: 50%; background: var(--c); }
+.crow .cbar { display: grid; gap: 4px; }
+.crow .cbar .track { height: 8px; border-radius: 99px; background: var(--line); overflow: hidden; }
+.crow .cbar .track i { display: block; height: 100%; }
+.crow .cbar small { font-size: 13.5px; }
+.crow.good .track i { background: var(--ok); } .crow.good small { color: var(--ok); }
+.crow.mid .track i { background: var(--warn); } .crow.mid small { color: var(--warn); }
+.crow.bad .track i { background: var(--rec); } .crow.bad small { color: var(--rec); }
+.usehead { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+.seg button { border: 0; border-radius: 0; padding: 10px 18px; font-size: 15px; }
+.seg button[aria-selected="true"] { background: var(--accent); color: var(--accent-ink); }
+#startBtn.on { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+.heard { display: grid; grid-template-columns: auto auto minmax(0, 1fr); gap: 4px 16px; align-items: baseline; padding: 14px 18px; border-radius: 10px; background: var(--sunken); margin-bottom: 14px; }
+.heard-label { font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.heard-sound { font: 800 34px/1 var(--display); letter-spacing: -0.02em; color: var(--muted); }
+.heard-did { font-size: 16px; color: var(--muted); }
+.heard.acted .heard-did { color: var(--ink); font-weight: 600; }
+@media (max-width: 600px) { .heard { grid-template-columns: minmax(0, 1fr); } }
+.ctlgrid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 860px) { .ctlgrid { grid-template-columns: minmax(0, 1fr); } }
+.reader .card { min-height: 220px; }
+.reader h4 { font-size: 28px; }
+.reader p { font-size: 16px; }
+.cheat ul { list-style: none; margin: 8px 0 12px; padding: 0; display: grid; gap: 6px; }
+.cheat li { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; background: var(--sunken); font-size: 15px; }
+.cheat li .d { width: 10px; height: 10px; border-radius: 50%; background: var(--c); flex: none; }
+.cheat li b { min-width: 48px; }
+.cheat li.flash, .drum.flash { background: color-mix(in srgb, var(--c) 28%, var(--sunken)); }
+.drumgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.drum { border-radius: 12px; padding: 22px 14px; background: var(--sunken); text-align: center; border-bottom: 5px solid var(--c); transition: background 100ms; }
+.drum b { display: block; font: 700 20px var(--display); }
+.drum span { font-size: 14px; color: var(--muted); }
+.advanced { margin-top: 18px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.advanced summary { cursor: pointer; padding: 14px 18px; font-weight: 600; }
+.advgrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; padding: 0 14px 14px; }
+@media (max-width: 980px) { .advgrid { grid-template-columns: minmax(0, 1fr); } }
+.advgrid .panel { background: var(--bg); }
+@media (prefers-reduced-motion: reduce) { .micdot.rec { animation: none; } }
+/* ---- Story ---- */
+:root { --serif: "Newsreader", "Iowan Old Style", Georgia, serif; --night: #0d141c; --night-ink: #eef3f7; --night-muted: #9eb0c0; --glow: #5fd4e4; }
+.opening { position: relative; background: var(--night); color: var(--night-ink); overflow: hidden; }
+#breath { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0.55; }
+.opening-inner { position: relative; padding-block: clamp(56px, 10vw, 120px) clamp(48px, 8vw, 96px); display: grid; gap: 20px; }
+.opening-inner > * { max-width: 820px; }
+.whisper { font: italic 400 20px var(--serif); color: var(--glow); margin: 0; }
+.opening h1 { font: 500 clamp(30px, 4.6vw, 54px)/1.12 var(--serif); letter-spacing: -0.01em; margin: 0; text-wrap: balance; color: var(--night-ink); }
+.opening-sub { font-size: clamp(17px, 2vw, 20px); color: var(--night-muted); margin: 0; max-width: 60ch; }
+.turn { font: 800 clamp(24px, 3.2vw, 36px)/1.15 var(--display); color: #fff; margin: 12px 0 0; letter-spacing: -0.015em; }
+.opening-cta { margin-top: 10px; gap: 12px; }
+.cta { display: inline-block; padding: 13px 22px; border-radius: 99px; background: var(--glow); color: #06222a; font-weight: 600; text-decoration: none; }
+.cta:hover { filter: brightness(1.07); }
+.cta.ghostlink { background: transparent; color: var(--night-ink); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.35); }
+.day { padding-block: 56px 40px; }
+.moments { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+@media (max-width: 980px) { .moments { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .moments { grid-template-columns: minmax(0, 1fr); } }
+.moments li { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px; display: grid; gap: 10px; align-content: start; }
+.moments time { font: 500 13px var(--mono); color: var(--accent); }
+.moments .before { font: 400 18px/1.4 var(--serif); margin: 0; }
+.moments .after { margin: 0; padding-top: 10px; border-top: 1px dashed var(--line); font-size: 14.5px; }
+.moments .after span { font-weight: 600; color: var(--accent); }
+.dignity { font: italic 500 clamp(22px, 3vw, 32px)/1.25 var(--serif); text-align: center; margin: 40px auto 0; max-width: 30ch; text-wrap: balance; }
+.facts-wrap { padding-block: 8px 40px; }
+.facts-wrap .facts { padding: 0; }
+.facts .fact strong { font-size: 30px; }
+.gapcard h3 { font: italic 500 21px/1.3 var(--serif); }
+.answer-wrap { padding-block: 44px 16px; }
+.promises { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.promises li { padding: 12px 14px; border-radius: 10px; background: var(--surface); border: 1px solid var(--line); }
+.topband { background: var(--night); color: var(--night-ink); }
+.topband .topbar { border-bottom-color: rgba(255,255,255,0.08); }
+.topband .skip, .topband .brand span { color: var(--glow); }
+.closing { background: var(--night); color: var(--night-ink); margin-top: 40px; }
+.closing-inner { padding-block: 64px; display: grid; gap: 14px; }
+.closing-inner > * { max-width: 680px; }
+.closing h2 { font: 500 clamp(26px, 3.6vw, 40px)/1.15 var(--serif); margin: 0; text-wrap: balance; }
+.closing p { margin: 0; font-size: 17px; color: var(--night-muted); }
+.closing .closing-line { font: italic 500 clamp(22px, 2.8vw, 30px)/1.3 var(--serif); color: #fff; margin: 12px 0; }
+.closing .closing-honest { font-size: 14.5px; }
+.closing .cta { justify-self: start; margin-top: 8px; }
+.closing .eyebrow, .opening .eyebrow { color: var(--glow); }
+footer { margin-top: 0; }
+.celebrate { margin-top: 12px; padding: 14px 16px; border-radius: 10px; background: color-mix(in srgb, var(--ok) 14%, var(--surface)); border: 1px solid color-mix(in srgb, var(--ok) 40%, transparent); font: italic 500 18px/1.4 var(--serif); }
+/* ---- Easy start ---- */
+.launcher { background: var(--surface); border: 2px solid var(--accent); border-radius: 14px; padding: 22px; margin-bottom: 16px; display: grid; gap: 14px; }
+.launch-title { font: 800 clamp(22px, 3vw, 28px)/1.15 var(--display); margin: 0; }
+.launch-sub { margin: 0; font-size: 16px; max-width: 70ch; }
+.launch-choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 640px) { .launch-choices { grid-template-columns: minmax(0, 1fr); } }
+.choice { display: grid; gap: 4px; text-align: left; padding: 18px 20px; border-radius: 12px; font-size: 15px; }
+.choice b { font: 700 21px var(--display); }
+.choice span { font-weight: 400; opacity: 0.85; }
+.launch-opts { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; padding-top: 12px; border-top: 1px solid var(--line); font-size: 14px; }
+.toggle { display: inline-flex; gap: 8px; align-items: center; cursor: pointer; }
+.toggle input { width: 18px; height: 18px; accent-color: var(--accent); }
+.toggle.big { align-items: flex-start; font-size: 15px; }
+.toggle.big input { margin-top: 3px; flex: none; }
+.kbd-hint { color: var(--muted); font-size: 13px; }
+kbd { font: 500 12px var(--mono); padding: 1px 6px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; background: var(--bg); }
+#bigTextBtn[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.guide { position: sticky; top: 8px; z-index: 5; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 16px; align-items: center; padding: 16px 20px; border-radius: 14px; background: var(--night); color: var(--night-ink); margin-bottom: 14px; box-shadow: 0 6px 24px rgba(0,0,0,0.18); }
+.guide-step { font: 500 12px var(--mono); text-transform: uppercase; letter-spacing: 0.08em; color: var(--glow); grid-column: 1; }
+.guide-text { font: 500 clamp(19px, 2.4vw, 26px)/1.3 var(--serif); grid-column: 1; }
+.guide button { grid-column: 2; grid-row: 1 / span 2; background: transparent; color: var(--night-ink); border-color: rgba(255,255,255,0.35); }
+.scanbox { margin-bottom: 14px; display: grid; gap: 10px; }
+.scanrow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+@media (max-width: 640px) { .scanrow { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.scanopt { padding: 16px 10px; border-radius: 10px; background: var(--sunken); text-align: center; font: 600 16px var(--display); border: 2px solid transparent; transition: background 120ms, border-color 120ms; }
+.scanopt.lit { background: var(--accent-soft); border-color: var(--accent); }
+.scanopt.chosen { background: var(--accent); color: var(--accent-ink); }
+body.bigtext { zoom: 1.2; }
+.cheat li.tipli { display: block; font-size: 14px; color: var(--muted); }
+.toggle.big span { font-weight: 400; }
+.toggle.big span b { font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="topband"><div class="wrap topbar">
+  <div class="brand">Acoustic<span>-</span>Alchemist</div>
+  <div class="row">
+    <a class="skip" href="#try">Try it now</a>
+  </div>
+</div></div>
+
+<main>
+  <section class="opening" aria-labelledby="h1">
+    <canvas id="breath" aria-hidden="true"></canvas>
+    <div class="wrap opening-inner">
+      <p class="whisper">Imagine this.</p>
+      <h1 id="h1">The video call has ended. Your daughter waved goodbye. The screen is still on, and you can't reach it.</h1>
+      <p class="opening-sub">So you wait for someone to come and close it. You wait to scroll. You wait to turn the page, pause the song, answer the message.</p>
+      <p class="turn">What if one small sound was enough?</p>
+      <div class="row opening-cta">
+        <a class="cta" href="#try">Try it with your voice</a>
+        <a class="cta ghostlink" href="#why">Read why we built it</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="wrap day" id="story" aria-labelledby="dayh">
+    <div class="eyebrow">An ordinary day</div>
+    <h2 class="section" id="dayh">The small things are the ones you have to ask for</h2>
+    <p class="lede quiet" style="font-size:16px;margin:0 0 22px">For people who can't easily use their hands, and can't always rely on their voice, the day is full of small moments of waiting. These moments are illustrations, not one person's story.</p>
+    <ol class="moments">
+      <li><time>7:40 am</time><p class="before">The news finishes and the next video starts playing. It isn't one you wanted.</p><p class="after"><span>With a sound:</span> a short hiss, and it pauses.</p></li>
+      <li><time>11:15 am</time><p class="before">The e-book reaches the bottom of the page. The carer is busy in the kitchen.</p><p class="after"><span>With a sound:</span> a lip pop, and the page turns.</p></li>
+      <li><time>4:30 pm</time><p class="before">A friend sends photos from a wedding you couldn't go to. You'd like to look through them alone.</p><p class="after"><span>With a sound:</span> pop, pop, click. Forward, forward, back.</p></li>
+      <li><time>9:00 pm</time><p class="before">You want to listen to music, without asking anyone to stay up and press play.</p><p class="after"><span>With a sound:</span> a hum to start listening, and the evening is yours.</p></li>
+    </ol>
+    <p class="dignity">This isn't about being fixed. It's about not having to ask.</p>
+  </section>
+
+  <section class="facts-wrap" aria-labelledby="factsh">
+    <div class="wrap">
+      <h2 class="section" id="factsh">This isn't rare. It's 1 in 6 of us.</h2>
+      <div class="facts">
+        <div class="fact"><strong>1.3 billion</strong><p>people live with a significant disability. That's a parent, a friend, a classmate. Someday, maybe you.</p><small>WHO, 2023 <a href="#src-1" aria-label="Source 1">[1]</a></small></div>
+        <div class="fact"><strong>Nearly 1 billion</strong><p>people who need assistive products, like a wheelchair or a communication aid, are denied them.</p><small>WHO &amp; UNICEF, 2022 <a href="#src-2" aria-label="Source 2">[2]</a></small></div>
+        <div class="fact"><strong>3% vs 90%</strong><p>Whether you get that help depends on where you're born: 3% access in poorer countries, 90% in wealthy ones.</p><small>WHO &amp; UNICEF, 2022 <a href="#src-2" aria-label="Source 2">[2]</a></small></div>
+        <div class="fact"><strong>26.8 million</strong><p>people in India were counted with a disability in the last census. Each of them is someone's whole world.</p><small>Census of India 2011 <a href="#src-4" aria-label="Source 4">[4]</a></small></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" aria-labelledby="gap">
+    <div class="wrap">
+      <h2 class="section" id="gap">Technology keeps assuming a body that many people don't have</h2>
+      <div class="gap3">
+        <div class="gapcard"><h3>“Just use the mouse.”</h3><p>Keyboards, mice and touchscreens need steady hands. Over 15 million people live with a spinal cord injury alone <a href="#src-3">[3]</a>, and arthritis, tremors or a broken wrist make it hard for many more.</p></div>
+        <div class="gapcard"><h3>“Just say it out loud.”</h3><p>Voice assistants need clear, steady speech. But the conditions that take away movement often take speech too. ALS slowly weakens the muscles used to speak <a href="#src-5">[5]</a>.</p></div>
+        <div class="gapcard"><h3>“There's a device for that.”</h3><p>There is, if you can get it. Eye trackers and switch devices exist, but access to assistive products is as low as 3% in poorer countries <a href="#src-2">[2]</a>.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="wrap answer-wrap" aria-labelledby="ours">
+    <div class="answer">
+      <div>
+        <div class="eyebrow">Our answer</div>
+        <h2 class="section" id="ours">It learns your voice. Not the other way round.</h2>
+        <p class="lede quiet" style="font-size:16px">Most technology asks people to fit it. Acoustic-Alchemist listens to the sounds <em>you</em> can make, a pop, a click, a hum, however they come out, and learns them. A weak pop is fine. An unusual click is fine. It's your sound, and that's the point.</p>
+        <div class="chips" aria-label="Who it could help">
+          <span class="chip">Spinal cord injury</span><span class="chip">ALS / motor neurone disease</span><span class="chip">Cerebral palsy</span><span class="chip">After a stroke</span><span class="chip">Arthritis or tremor</span><span class="chip">A broken arm</span><span class="chip">Hands that are busy</span>
+        </div>
+      </div>
+      <ul class="promises">
+        <li><b>Any voice.</b> Trained on your own recordings, in a few minutes.</li>
+        <li><b>Nothing to buy.</b> An ordinary laptop microphone.</li>
+        <li><b>Private.</b> Your sounds never leave your computer.</li>
+        <li><b>Careful.</b> It only acts when it's sure, and one sound pauses it, so a cough in a meeting never flips a slide.</li>
+        <li><b>Joyful.</b> The same sounds can play drums, because practice should feel like play.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="wrap tool" id="try" aria-labelledby="tryh">
+    <div class="eyebrow">Now it's your turn</div>
+    <h2 class="section" id="tryh" style="margin:4px 0 6px">Teach it your sounds, then read our story without touching anything</h2>
+    <p class="lede quiet" style="font-size:15px;margin:0 0 18px">About 10 minutes. Wear wired headphones so the microphone doesn't hear the computer. Your sounds stay on this computer.</p>
+
+    <section class="launcher" id="launcher" aria-label="Get started">
+      <div id="launchNew">
+        <h3 class="launch-title">The easiest way: let it guide you</h3>
+        <p class="launch-sub">Press one button. It talks you through everything, records by itself and starts listening when it's ready. <b>No more clicking after that.</b> Ideal if someone is helping you set up.</p>
+        <div class="launch-choices">
+          <button class="choice primary" id="quickBtn"><b>Quick start</b><span>About 2 minutes · one sound (a lip pop) is enough</span></button>
+          <button class="choice" id="fullBtn"><b>Full setup</b><span>About 6 minutes · all five sounds, more actions</span></button>
+        </div>
+      </div>
+      <div id="launchBack" hidden>
+        <h3 class="launch-title">Welcome back</h3>
+        <p class="launch-sub">Your sounds are saved on this computer, so there's nothing to set up again.</p>
+        <div class="launch-choices">
+          <button class="choice primary" id="resumeBtn"><b>Start listening</b><span>Go straight to hands-free control</span></button>
+          <button class="choice" id="redoBtn"><b>Teach it again</b><span>Guided setup, about 2 minutes</span></button>
+        </div>
+      </div>
+      <div class="launch-opts">
+        <label class="toggle"><input type="checkbox" id="speakToggle" checked> Speak instructions aloud</label>
+        <button class="small" id="bigTextBtn" aria-pressed="false">A+ Bigger text</button>
+        <span class="kbd-hint">Helping someone? Keyboard: <kbd>Space</kbd> record · <kbd>→</kbd> next sound · <kbd>S</kbd> start/stop listening · <kbd>Esc</kbd> stop guide</span>
+      </div>
+    </section>
+
+    <div class="guide" id="guide" hidden role="status" aria-live="assertive">
+      <div class="guide-step" id="guideStep">Guided setup</div>
+      <div class="guide-text" id="guideText">Getting ready…</div>
+      <button class="small" id="guideStop">Stop the guide</button>
+    </div>
+
+    <nav class="stepper" aria-label="Steps">
+      <button class="stepbtn" id="go-teach" aria-current="step"><span class="num">1</span><span><b>Teach</b><small>Record your sounds</small></span></button>
+      <button class="stepbtn" id="go-check"><span class="num">2</span><span><b>Check</b><small>See what it learned</small></span></button>
+      <button class="stepbtn" id="go-use"><span class="num">3</span><span><b>Use</b><small>Go hands-free</small></span></button>
+    </nav>
+
+    <div class="micbar" role="status" aria-live="polite">
+      <span class="micdot" id="micDot" aria-hidden="true"></span>
+      <span class="mictext" id="status">The microphone turns on when you press Record.</span>
+      <span class="miclevel" aria-hidden="true"><i id="lvl"></i></span>
+    </div>
+    <div class="note" id="secureNote" hidden>The microphone can't be used when this page is opened straight from Finder. In Terminal, go to the project folder and run <code>python3 -m http.server 8000</code>, then open <code>http://localhost:8000/tester.html</code> in Chrome.</div>
+
+    <!-- STEP 1: TEACH -->
+    <section class="stage" id="stage-teach" aria-label="Step 1: Teach">
+      <div class="chips-row" id="soundChips" role="tablist" aria-label="Sounds"></div>
+      <div class="teachcard" id="teachCard" style="--c:var(--c-pop)">
+        <div class="tc-left">
+          <div class="tc-count" id="tcCount">Sound 1 of 6</div>
+          <h3 class="tc-name" id="tcName">Lip pop</h3>
+          <p class="tc-how" id="tcHow"></p>
+          <p class="tc-tip" id="tcTip"></p>
+          <div class="tc-progress" aria-hidden="true"><i id="tcBar"></i></div>
+          <div class="tc-have" id="tcHave">0 of 20 examples</div>
+        </div>
+        <div class="tc-right">
+          <button class="recbig" id="recBtn"><span class="recdot" aria-hidden="true"></span><span id="recLabel">Record</span></button>
+          <div class="dots" id="dots" aria-hidden="true"></div>
+          <div class="tc-feedback" id="tcFeedback" aria-live="polite"></div>
+        </div>
+      </div>
+      <div class="navrow">
+        <button id="undoBtn" class="ghost">Undo last recording</button>
+        <span class="spacer"></span>
+        <button id="skipBtn" class="ghost">Skip this sound</button>
+        <button id="nextSoundBtn" class="primary big">Next sound →</button>
+      </div>
+    </section>
+
+    <!-- STEP 2: CHECK -->
+    <section class="stage" id="stage-check" aria-label="Step 2: Check" hidden>
+      <div class="checkhead">
+        <div class="ring" id="scoreRing"><span id="scoreNum">–</span></div>
+        <div>
+          <h3 class="tc-name" id="scoreWords" style="margin:0">Record some sounds first</h3>
+          <p class="hint" style="margin:4px 0 0" id="scoreSub">It needs at least two sounds to compare.</p>
+        </div>
+      </div>
+      <div class="checklist" id="checkList"></div>
+      <p class="why"><b>Why this matters:</b> for someone who depends on this, a wrong action is worse than a missed one. Aim for every sound to say “Works well”.</p>
+      <div class="navrow">
+        <button id="backTeachBtn" class="ghost">← Record more</button>
+        <span class="spacer"></span>
+        <button id="toUseBtn" class="primary big" disabled>Start using it →</button>
+      </div>
+    </section>
+
+    <!-- STEP 3: USE -->
+    <section class="stage" id="stage-use" aria-label="Step 3: Use" hidden>
+      <div class="usehead">
+        <div class="seg" role="tablist" aria-label="Mode">
+          <button role="tab" id="tabControl" aria-selected="true">Hands-free control</button>
+          <button role="tab" id="tabMusic" aria-selected="false">Music</button>
+        </div>
+        <button class="primary big" id="startBtn">Start listening</button>
+      </div>
+
+      <div class="heard" id="heard" aria-live="polite">
+        <div class="heard-label">Heard</div>
+        <div class="heard-sound" id="heardSound">–</div>
+        <div class="heard-did" id="heardDid">Press Start, then make a sound.</div>
+      </div>
+
+      <div id="paneControl">
+        <div class="scanbox">
+          <label class="toggle big"><input type="checkbox" id="scanToggle"> <span><b>One-sound mode</b>: the options below light up in turn, and any of your sounds picks the lit one. Everything works with a single sound.</span></label>
+          <div class="scanrow" id="scanRow" hidden>
+            <div class="scanopt" data-a="next">Next card →</div>
+            <div class="scanopt" data-a="previous">← Previous card</div>
+            <div class="scanopt" data-a="read">Read aloud</div>
+            <div class="scanopt" data-a="start">First card</div>
+          </div>
+        </div>
+        <div class="ctlgrid">
+          <div class="reader" aria-label="Hands-free reader">
+            <div class="card" id="card" aria-live="polite"></div>
+            <div class="bar">
+              <button class="small" id="prevBtn" aria-label="Previous card">← Previous</button>
+              <span class="pos" id="cardPos">1 / 6</span>
+              <button class="small" id="nextBtn" aria-label="Next card">Next →</button>
+            </div>
+          </div>
+          <div class="cheat" aria-label="What each sound does">
+            <p class="celebrate" id="celebrate" hidden>You reached the end without touching anything. Thank you for listening.</p>
+            <div class="label">Your sounds do this</div>
+            <ul id="cheatList"></ul>
+            <span class="listen" id="listenPill" hidden>Listening</span>
+          </div>
+        </div>
+      </div>
+
+      <div id="paneMusic" hidden>
+        <div class="drumgrid" id="drumGrid"></div>
+      </div>
+    </section>
+
+    <details class="advanced">
+      <summary>Advanced settings and details</summary>
+      <div class="advgrid">
+        <div class="panel">
+          <div class="label">Microphone, last 4 seconds</div>
+          <div class="scope" style="margin-top:8px"><canvas id="scope" aria-hidden="true"></canvas></div>
+          <div class="slider" style="margin-top:12px"><label class="label" for="sens">Sensitivity <span id="sensVal">1.0</span>. Raise if quiet sounds are missed</label><input id="sens" type="range" min="0.5" max="2.5" step="0.1" value="1"></div>
+          <div class="label" style="margin-top:14px">What the model sees for the last sound</div>
+          <div class="heat" style="margin-top:6px"><canvas id="heat" width="9" height="40" aria-hidden="true"></canvas></div>
+          <p class="hint" style="margin:6px 0 0">40 pitch bands (low at the bottom) over 100 ms. Each sound makes its own shape.</p>
+        </div>
+        <div class="panel">
+          <div class="label">What each sound does in control mode</div>
+          <div class="tablewrap" style="margin-top:4px"><table><tbody id="mapRows"></tbody></table></div>
+          <div class="slider" style="margin-top:12px"><label class="label" for="thrCtl">Control: act only when this sure <span id="thrCtlVal">0.70</span></label><input id="thrCtl" type="range" min="0.4" max="1" step="0.05" value="0.7"></div>
+          <div class="slider" style="margin-top:10px"><label class="label" for="thrMusic">Music: minimum confidence <span id="thrMusicVal">0.55</span></label><input id="thrMusic" type="range" min="0.2" max="1" step="0.05" value="0.55"></div>
+          <div class="kv">
+            <div><span class="label">Confidence</span><strong id="lastConf">–</strong></div>
+            <div><span class="label">Delay</span><strong id="lastLat">–</strong></div>
+            <div><span class="label">Heard</span><strong id="hitCount">0</strong></div>
+          </div>
+          <div class="label" style="margin-top:14px">Recent sounds</div>
+          <ul class="log" id="log"></ul>
+        </div>
+        <div class="panel">
+          <div class="label">Your recordings</div>
+          <p class="hint">Download them for the full neural-network model: unzip inside the project folder, then run <code>python train.py</code>. They're also kept in this browser.</p>
+          <div class="row">
+            <button class="primary" id="exportBtn" disabled>Download data.zip</button>
+            <button id="wipeBtn">Delete all recordings</button>
+          </div>
+          <div class="status" id="exportStatus"></div>
+          <div class="row" style="margin-top:12px">
+            <label class="label" for="who">Your name (for file names)</label>
+            <input id="who" type="text" value="akshata" autocomplete="off">
+          </div>
+        </div>
+      </div>
+    </details>
+  </section>
+  <section class="closing" id="why" aria-labelledby="whyh">
+    <div class="wrap closing-inner">
+      <div class="eyebrow">Why we built it</div>
+      <h2 id="whyh">We started out building a beatbox drum machine.</h2>
+      <p>It was fun. You could make a beat with your mouth. Then we asked a harder question: who would this matter to most? Not people who already have a hundred ways to use a computer, but people who have none that work for them.</p>
+      <p>So we kept the drums, and gave the same sounds a second job: turning pages, pausing videos and moving slides, for someone who otherwise has to wait.</p>
+      <p class="closing-line">Independence is made of small moments. We want to give a few of them back.</p>
+      <p class="closing-honest">Acoustic-Alchemist is a student prototype built in 10 days, not a medical device. Our next step is the most important one: building it <em>with</em> the people it's for, not just for them.</p>
+      <a class="cta" href="#try">Try it with your voice</a>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div>
+      <h3>Sources</h3>
+      <ol>
+        <li id="src-1"><a href="https://www.who.int/news-room/fact-sheets/detail/disability-and-health" target="_blank" rel="noopener">WHO, Disability fact sheet</a> (7 March 2023)</li>
+        <li id="src-2"><a href="https://www.who.int/news-room/releases/16-05-2022-almost-one-billion-children-and-adults-with-disabilities-and-older-persons-in-need-of-assistive-technology-denied-access--according-to-new-report" target="_blank" rel="noopener">WHO &amp; UNICEF, Global report on assistive technology, news release</a> (16 May 2022)</li>
+        <li id="src-3"><a href="https://www.who.int/news-room/fact-sheets/detail/spinal-cord-injury" target="_blank" rel="noopener">WHO, Spinal cord injury fact sheet</a> (16 April 2024)</li>
+        <li id="src-4"><a href="https://factly.in/data-persons-with-disabilities-make-up-more-than-2-of-indias-population-with-some-states-reporting-a-higher-than-national-average" target="_blank" rel="noopener">Factly, Census 2011 data on persons with disabilities</a></li>
+        <li id="src-5"><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC6693567" target="_blank" rel="noopener">Speech intelligibility decline in ALS</a> (Journal of Speech, Language, and Hearing Research)</li>
+      </ol>
+    </div>
+    <div>
+      <h3>About</h3>
+      <p>Acoustic-Alchemist, by Team Winners (Akshata Sinha and Pratishtha) for Hack on Holiday 2026, Reinforce Club, Scaler School of Technology.</p>
+      <p>Problem statement: “Acoustic-Alchemist: Non-Verbal Audio &amp; Environmental Trigger System”, a real-time audio classification and DSP pipeline that reacts to non-speech sounds.</p>
+      <p>A prototype, not a medical device.</p>
+    </div>
+  </div>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+// ===== CORE START (same maths as the Python project: alchemist/features.py and onset.py) =====
+const SR = 16000, BLOCK = 256, NFFT = 512, HOP = 128, NMELS = 40;
+const CLIP = 1600, PRE = 320, POST = CLIP - PRE;      // 100 ms window, 20 ms before the onset
+const CLASSES = ["pop", "click", "hiss", "hum", "tap", "noise"];
+const SOUND_MAP = { pop: "kick", click: "rim", hiss: "hat", hum: "tom", tap: "snare" };
+
+const hzToMel = h => 2595 * Math.log10(1 + h / 700);
+const melToHz = m => 700 * (Math.pow(10, m / 2595) - 1);
+
+function melFB(sr, nfft, nm, fmin = 30) {
+  const lo = hzToMel(fmin), hi = hzToMel(sr / 2), hz = [];
+  for (let i = 0; i < nm + 2; i++) hz.push(melToHz(lo + (hi - lo) * i / (nm + 1)));
+  const nb = nfft / 2 + 1, fb = [];
+  for (let i = 0; i < nm; i++) {
+    const row = new Float64Array(nb), a = hz[i], b = hz[i + 1], c = hz[i + 2], w = 2 / (c - a);
+    for (let k = 0; k < nb; k++) {
+      const f = k * sr / nfft;
+      row[k] = Math.max(0, Math.min((f - a) / (b - a), (c - f) / (c - b))) * w;
+    }
+    fb.push(row);
+  }
+  return fb;
+}
+
+function hann(n) { const w = new Float64Array(n); for (let i = 0; i < n; i++) w[i] = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / (n - 1)); return w; }
+
+function makePowerSpectrum(n) {
+  const levels = Math.log2(n), rev = new Uint32Array(n);
+  for (let i = 0; i < n; i++) { let r = 0, x = i; for (let j = 0; j < levels; j++) { r = (r << 1) | (x & 1); x >>= 1; } rev[i] = r; }
+  const cos = new Float64Array(n / 2), sin = new Float64Array(n / 2);
+  for (let i = 0; i < n / 2; i++) { cos[i] = Math.cos(2 * Math.PI * i / n); sin[i] = Math.sin(2 * Math.PI * i / n); }
+  const re = new Float64Array(n), im = new Float64Array(n), out = new Float64Array(n / 2 + 1);
+  return function (x) {
+    for (let i = 0; i < n; i++) { re[rev[i]] = x[i]; im[rev[i]] = 0; }
+    for (let size = 2; size <= n; size *= 2) {
+      const half = size / 2, step = n / size;
+      for (let i = 0; i < n; i += size) {
+        for (let j = 0, k = 0; j < half; j++, k += step) {
+          const l = i + j + half;
+          const tr = re[l] * cos[k] + im[l] * sin[k], ti = -re[l] * sin[k] + im[l] * cos[k];
+          re[l] = re[i + j] - tr; im[l] = im[i + j] - ti; re[i + j] += tr; im[i + j] += ti;
+        }
+      }
+    }
+    for (let k = 0; k <= n / 2; k++) out[k] = re[k] * re[k] + im[k] * im[k];
+    return out;
+  };
+}
+
+const POWER = makePowerSpectrum(NFFT), WIN = hann(NFFT);
+const FB40 = melFB(SR, NFFT, NMELS), FB24 = melFB(SR, NFFT, 24);
+const NFRAMES = 1 + Math.floor((CLIP - NFFT) / HOP);   // 9
+const NFEAT = NMELS * NFRAMES;
+
+// Log-mel features of one clip, layout [mel][frame]. Mirrors features.clip_features().
+function clipFeatures(clipIn) {
+  const clip = new Float64Array(CLIP);
+  let peak = 0;
+  for (let i = 0; i < CLIP && i < clipIn.length; i++) { clip[i] = clipIn[i]; peak = Math.max(peak, Math.abs(clipIn[i])); }
+  if (peak > 1e-5) for (let i = 0; i < CLIP; i++) clip[i] /= peak;
+  const feat = new Float32Array(NFEAT), frame = new Float64Array(NFFT);
+  for (let t = 0; t < NFRAMES; t++) {
+    for (let i = 0; i < NFFT; i++) frame[i] = clip[t * HOP + i] * WIN[i];
+    const p = POWER(frame);
+    for (let m = 0; m < NMELS; m++) {
+      let s = 0; const row = FB40[m];
+      for (let k = 0; k < row.length; k++) s += row[k] * p[k];
+      feat[m * NFRAMES + t] = Math.log(s + 1e-6);
+    }
+  }
+  return feat;
+}
+
+function median(a) { const s = [...a].sort((x, y) => x - y), n = s.length; return n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2; }
+function percentile(a, q) { const s = [...a].sort((x, y) => x - y), pos = (s.length - 1) * q / 100, i = Math.floor(pos), f = pos - i; return i + 1 < s.length ? s[i] * (1 - f) + s[i + 1] * f : s[i]; }
+
+// Streaming onset detector: mel-band spectral flux + adaptive threshold + noise gate. Mirrors onset.OnsetDetector.
+class OnsetDetector {
+  constructor(sensitivity = 1) {
+    this.buf = new Float64Array(NFFT); this.prev = null; this.fluxHist = []; this.rmsHist = [];
+    this.noise = 1e-3; this.sensitivity = sensitivity; this.refractory = Math.floor(0.07 * SR);
+    this.seen = 0; this.last = -1e9; this.lastRms = 0; this.frame = new Float64Array(NFFT);
+  }
+  process(block) {
+    const n = block.length;
+    this.buf.copyWithin(0, n); this.buf.set(block, NFFT - n); this.seen += n;
+    for (let i = 0; i < NFFT; i++) this.frame[i] = this.buf[i] * WIN[i];
+    const p = POWER(this.frame), mel = new Float64Array(24);
+    for (let m = 0; m < 24; m++) { let s = 0; const row = FB24[m]; for (let k = 0; k < row.length; k++) s += row[k] * p[k]; mel[m] = Math.log1p(100 * s); }
+    let flux = 0;
+    if (this.prev) for (let m = 0; m < 24; m++) flux += Math.max(0, mel[m] - this.prev[m]);
+    this.prev = mel;
+    let sq = 0; for (let i = 0; i < n; i++) sq += block[i] * block[i];
+    const rms = Math.sqrt(sq / n) + 1e-9; this.lastRms = rms;
+    const hist = this.fluxHist.length ? this.fluxHist : [flux];
+    const threshold = (median(hist) * 2 + 2) / this.sensitivity;
+    this.fluxHist.push(flux); if (this.fluxHist.length > 30) this.fluxHist.shift();
+    this.rmsHist.push(rms); if (this.rmsHist.length > 125) this.rmsHist.shift();
+    this.noise = Math.max(percentile(this.rmsHist, 20), 1e-4);
+    const loud = rms > this.noise * 4 && rms > 0.005;
+    if (flux > threshold && loud && this.seen - this.last > this.refractory) { this.last = this.seen; return this.seen - n; }
+    return null;
+  }
+}
+
+// k-nearest-neighbours on standardised log-mel features. A quick stand-in for the CNN in train.py.
+class KNN {
+  constructor(items) {               // items: [{feat, label}]
+    this.items = items; const d = NFEAT, n = items.length;
+    this.mean = new Float32Array(d); this.std = new Float32Array(d);
+    for (const it of items) for (let j = 0; j < d; j++) this.mean[j] += it.feat[j] / n;
+    for (const it of items) for (let j = 0; j < d; j++) this.std[j] += (it.feat[j] - this.mean[j]) ** 2 / n;
+    for (let j = 0; j < d; j++) this.std[j] = Math.sqrt(this.std[j]) + 1e-5;
+    this.X = items.map(it => this.norm(it.feat));
+    this.k = Math.max(1, Math.min(5, n - 1));
+  }
+  norm(f) { const z = new Float32Array(NFEAT); for (let j = 0; j < NFEAT; j++) z[j] = (f[j] - this.mean[j]) / this.std[j]; return z; }
+  predictNorm(z, skip = -1) {
+    const ds = [];
+    for (let i = 0; i < this.X.length; i++) {
+      if (i === skip) continue;
+      let s = 0; const x = this.X[i]; for (let j = 0; j < NFEAT; j++) { const t = x[j] - z[j]; s += t * t; }
+      ds.push([s, this.items[i].label]);
+    }
+    ds.sort((a, b) => a[0] - b[0]);
+    const votes = {}, k = Math.min(this.k, ds.length);
+    for (let i = 0; i < k; i++) votes[ds[i][1]] = (votes[ds[i][1]] || 0) + 1;
+    let best = null, bv = -1; for (const [l, v] of Object.entries(votes)) if (v > bv) { best = l; bv = v; }
+    return { label: best, conf: bv / k };
+  }
+  predict(feat) { return this.predictNorm(this.norm(feat)); }
+  leaveOneOut() { return this.X.map((z, i) => ({ truth: this.items[i].label, ...this.predictNorm(z, i) })); }
+}
+// ===== CORE END =====
+
+// ===== Sounds (same recipes as alchemist/synth.py) =====
+function makeKit(sr) {
+  const N = s => Math.floor(s * sr), noise = () => Math.random() * 2 - 1;
+  const hp = (x, a) => { const y = new Float32Array(x.length); for (let i = 1; i < x.length; i++) y[i] = a * (y[i - 1] + x[i] - x[i - 1]); return y; };
+  const env = (t, att, dec) => Math.min(1, t / att) * Math.exp(-t / dec);
+  const kit = {};
+  { const n = N(0.45), y = new Float32Array(n); let ph = 0;
+    for (let i = 0; i < n; i++) { const t = i / sr, f = 45 + 110 * Math.exp(-t / 0.04); ph += 2 * Math.PI * f / sr; y[i] = (Math.sin(ph) * env(t, 0.002, 0.18) + noise() * Math.exp(-t / 0.003) * 0.3) * 0.9; } kit.kick = y; }
+  { const n = N(0.3), r = new Float32Array(n); for (let i = 0; i < n; i++) r[i] = noise(); const rh = hp(r, 0.7), y = new Float32Array(n);
+    for (let i = 0; i < n; i++) { const t = i / sr; y[i] = (0.5 * Math.sin(2 * Math.PI * 190 * t) * Math.exp(-t / 0.05) + 0.8 * rh[i] * Math.exp(-t / 0.09)) * 0.7; } kit.snare = y; }
+  { const n = N(0.08), r = new Float32Array(n); for (let i = 0; i < n; i++) r[i] = noise(); const h = hp(r, 0.97);
+    for (let i = 0; i < n; i++) h[i] *= Math.exp(-(i / sr) / 0.018) * 0.45; kit.hat = h; }
+  { const n = N(0.3), r = new Float32Array(n); for (let i = 0; i < n; i++) r[i] = noise(); const h = hp(r, 0.85);
+    for (let i = 0; i < n; i++) { const t = i / sr; let e = Math.exp(-t / 0.12) * 0.5; for (const off of [0, 0.011, 0.022]) if (t >= off) e += Math.exp(-(t - off) / 0.012); h[i] *= e * 0.4; } kit.clap = h; }
+  { const n = N(0.12), y = new Float32Array(n);
+    for (let i = 0; i < n; i++) { const t = i / sr; y[i] = ((Math.sin(2 * Math.PI * 1700 * t) + 0.6 * Math.sin(2 * Math.PI * 820 * t)) * Math.exp(-t / 0.02) + noise() * Math.exp(-t / 0.004) * 0.4) * 0.45; } kit.rim = y; }
+  { const n = N(0.4), y = new Float32Array(n); let ph = 0;
+    for (let i = 0; i < n; i++) { const t = i / sr, f = 110 + 60 * Math.exp(-t / 0.08); ph += 2 * Math.PI * f / sr; y[i] = Math.sin(ph) * env(t, 0.002, 0.2) * 0.75; } kit.tom = y; }
+  return kit;
+}
+
+
+// ===== App =====
+const SOUNDS = {
+  pop:   { name: "Lip pop",     how: "Press your lips together, then release them: “p”.", tip: "About 10 pops with a short pause between each. Soft is fine: it learns your pop, however it sounds." },
+  click: { name: "Tongue click", how: "Click your tongue: “tsk”, or a cluck.", tip: "About 10 clicks, with a short pause between each one." },
+  hiss:  { name: "Short hiss",  how: "A quick “ts” or “sss”.", tip: "Keep each one short, about half a second." },
+  hum:   { name: "Short hum",   how: "A short “mm” with your mouth closed.", tip: "Keep each hum short, about half a second." },
+  tap:   { name: "Tap",         how: "Tap a knuckle, finger or foot on something nearby.", tip: "Skip this one if tapping isn't comfortable for you." },
+  noise: { name: "Everyday noise", how: "Talk, breathe, type and cough normally.", tip: "This teaches it what to ignore. Just carry on for 8 seconds." }
+};
+const TARGET = 20, TAKE_MAX_HITS = 12, TAKE_SECONDS = 10, NOISE_SECONDS = 8;
+const ACTIONS = { next: "Next card", previous: "Previous card", read: "Read card aloud", start: "Back to first card", toggle: "Pause / resume", none: "Nothing" };
+const DEFAULT_MAP = { pop: "next", click: "previous", hiss: "read", hum: "toggle", tap: "start" };
+const DRUM_NAMES = { kick: "Kick drum", rim: "Rimshot", hat: "Hi-hat", tom: "Tom", snare: "Snare" };
+const CARDS = [
+  { k: "Try it", h: "Make your pop sound to turn this page.", p: "No keyboard. No mouse. No touching the screen. Just a small sound, and the page moves.", s: "" },
+  { k: "Imagine", h: "For you, this is a demo. For someone else, it could be the first page they've turned alone in years.", p: "Turning a page, pausing a video, answering a message: small things, until you have to ask someone else to do them.", s: "" },
+  { k: "The scale", h: "1 in 6 people live with a significant disability.", p: "About 1.3 billion people. Parents, friends, classmates. Someday, maybe us.", s: "WHO, 2023" },
+  { k: "The gap", h: "Keyboards need hands. Voice assistants need clear speech.", p: "The conditions that take away movement often take speech too, which leaves many people out of both.", s: "" },
+  { k: "The unfairness", h: "Nearly 1 billion people are denied the assistive products they need.", p: "Access is 3% in poorer countries and 90% in wealthy ones. Where you're born decides whether you get help.", s: "WHO & UNICEF, 2022" },
+  { k: "Our answer", h: "It learns your sounds, however they come out.", p: "A few recordings of your own pop, click or hum train a small neural network. An ordinary laptop, nothing uploaded, nothing to buy.", s: "" },
+  { k: "You did it", h: "You just read this whole story with your voice alone.", p: "Now imagine that was the only way you could. Independence is made of small moments. We want to give a few of them back.", s: "" }
+];
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const $ = id => document.getElementById(id);
+
+let ctx = null, kitBuffers = null, tickBuf = null, det = new OnsetDetector(1);
+let micOn = false, mode = "idle";            // idle | countdown | rec | control | music
+let recClass = null, recSession = null, recUntil = 0, recStart = 0, lastNoiseWin = 0, takeHits = 0;
+let model = null, thrCtl = 0.7, thrMusic = 0.55, hitCount = 0;
+let listening = true, lastActionAt = -1e9, cardIdx = 0, useMode = "control", soundIdx = 0;
+let actionMap = { ...DEFAULT_MAP }, skipped = new Set();
+const RING = SR * 4, ring = new Float32Array(RING);
+let pending = [], markers = [];
+let data = Object.fromEntries(CLASSES.map(c => [c, []]));
+
+function writeRing(block, start) { for (let i = 0; i < block.length; i++) ring[(start + i) % RING] = block[i]; }
+function readClip(start) { const c = new Float32Array(CLIP); for (let i = 0; i < CLIP; i++) { const a = start + i; if (a >= 0 && det.seen - a <= RING && a < det.seen) c[i] = ring[a % RING]; } return c; }
+
+// --- Persistence (per-browser convenience; the zip is the real save) ---
+const KEY = "alch-clips-v2";
+function toB64(f32) { const i16 = new Int16Array(f32.length); for (let i = 0; i < f32.length; i++) i16[i] = Math.max(-1, Math.min(1, f32[i])) * 32767; let s = ""; const b = new Uint8Array(i16.buffer); for (let i = 0; i < b.length; i += 8192) s += String.fromCharCode.apply(null, b.subarray(i, i + 8192)); return btoa(s); }
+function fromB64(s) { const bin = atob(s), b = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) b[i] = bin.charCodeAt(i); const i16 = new Int16Array(b.buffer), f = new Float32Array(i16.length); for (let i = 0; i < i16.length; i++) f[i] = i16[i] / 32768; return f; }
+function save() { try { const o = {}; for (const c of CLASSES) o[c] = data[c].map(x => ({ s: x.s, d: toB64(x.clip) })); localStorage.setItem(KEY, JSON.stringify(o)); } catch (e) { } }
+function load() {
+  try { const o = JSON.parse(localStorage.getItem(KEY) || "null"); if (o) for (const c of CLASSES) data[c] = (o[c] || []).map(x => ({ s: x.s, clip: fromB64(x.d) })); } catch (e) { }
+  try { const m = JSON.parse(localStorage.getItem("alch-map") || "null"); if (m) for (const c of Object.keys(DEFAULT_MAP)) if (ACTIONS[m[c]]) actionMap[c] = m[c]; } catch (e) { }
+  try { const w = localStorage.getItem("alch-who"); if (w) $("who").value = w; } catch (e) { }
+}
+$("who").addEventListener("change", () => { try { localStorage.setItem("alch-who", $("who").value); } catch (e) { } });
+
+// --- Audio ---
+async function ensureCtx() {
+  if (!ctx) {
+    ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: "interactive" });
+    const kit = makeKit(ctx.sampleRate); kitBuffers = {};
+    for (const [k, v] of Object.entries(kit)) { const b = ctx.createBuffer(1, v.length, ctx.sampleRate); b.copyToChannel(v, 0); kitBuffers[k] = b; }
+    const n = Math.floor(0.05 * ctx.sampleRate), t = new Float32Array(n);
+    for (let i = 0; i < n; i++) t[i] = Math.sin(2 * Math.PI * 1320 * i / ctx.sampleRate) * Math.exp(-i / ctx.sampleRate / 0.012) * 0.25;
+    tickBuf = ctx.createBuffer(1, n, ctx.sampleRate); tickBuf.copyToChannel(t, 0);
+  }
+  if (ctx.state === "suspended") await ctx.resume();
+}
+function playBuf(buf, gain = 1, rate = 1) {
+  if (!ctx || !buf) return;
+  const s = ctx.createBufferSource(), g = ctx.createGain(); s.buffer = buf; s.playbackRate.value = rate; g.gain.value = gain;
+  s.connect(g).connect(ctx.destination); s.start();
+}
+const playSound = (name, gain) => playBuf(kitBuffers && kitBuffers[name], gain);
+const beep = (high = true) => playBuf(tickBuf, 0.8, high ? 1 : 0.67);
+
+class Resampler {
+  constructor(inRate, onBlock) { this.r = inRate / SR; this.pos = 0; this.carry = new Float32Array(0); this.out = new Float32Array(BLOCK); this.fill = 0; this.onBlock = onBlock; }
+  push(x) {
+    const s = new Float32Array(this.carry.length + x.length); s.set(this.carry); s.set(x, this.carry.length);
+    let p = this.pos;
+    while (p + 1 < s.length) { const i = Math.floor(p), f = p - i; this.out[this.fill++] = s[i] * (1 - f) + s[i + 1] * f; if (this.fill === BLOCK) { this.onBlock(this.out.slice()); this.fill = 0; } p += this.r; }
+    const drop = Math.floor(p); this.carry = s.slice(drop); this.pos = p - drop;
+  }
+}
+
+async function startMic() {
+  if (micOn) return true;
+  if (!window.isSecureContext || !navigator.mediaDevices) { $("secureNote").hidden = false; setStatus("The browser blocked the microphone on this page. See the note below.", true); return false; }
+  try {
+    setStatus("Allow the microphone when your browser asks.");
+    await ensureCtx();
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1 } });
+    const src = ctx.createMediaStreamSource(stream), lp = ctx.createBiquadFilter(), proc = ctx.createScriptProcessor(1024, 1, 1), mute = ctx.createGain();
+    lp.type = "lowpass"; lp.frequency.value = 7000; mute.gain.value = 0;
+    const rs = new Resampler(ctx.sampleRate, onBlock);
+    proc.onaudioprocess = e => rs.push(e.inputBuffer.getChannelData(0));
+    src.connect(lp).connect(proc).connect(mute).connect(ctx.destination);
+    window._keep = { stream, proc };
+    micOn = true; setMicDot("on");
+    setStatus("Microphone is on. Nothing leaves this computer.");
+    return true;
+  } catch (e) {
+    if (e && e.name === "NotAllowedError") setStatus("Microphone access was blocked. Click the icon in the address bar to allow it, then reload the page.", true);
+    else setStatus("Couldn't start the microphone: " + (e && e.message || e), true);
+    return false;
+  }
+}
+function setStatus(t, bad = false) { const s = $("status"); s.textContent = t; s.classList.toggle("bad", bad); }
+function setMicDot(state) { const d = $("micDot"); d.className = "micdot" + (state ? " " + state : ""); }
+
+// --- Pipeline, block by block ---
+function onBlock(block) {
+  const start = det.seen;
+  writeRing(block, start);
+  const o = det.process(block);
+  const end = det.seen;
+  if (o !== null) {
+    const m = { t: o, cls: null }; markers.push(m);
+    if (mode === "rec" || mode === "control" || mode === "music") pending.push({ o, m });
+  }
+  if (mode === "rec" && recClass === "noise" && end - lastNoiseWin >= 2400 && end - recStart >= CLIP) {
+    lastNoiseWin = end; data.noise.push({ s: recSession, clip: readClip(end - CLIP) }); takeHits++; renderTeachProgress();
+  }
+  const ready = pending.filter(p => p.o + POST <= end); pending = pending.filter(p => p.o + POST > end);
+  for (const p of ready) handleHit(readClip(p.o - PRE), p, end);
+  if (mode === "rec") {
+    const enough = recClass !== "noise" && takeHits >= TAKE_MAX_HITS;
+    if (enough || performance.now() >= recUntil) finishRecording();
+  }
+}
+
+function handleHit(clip, p, end) {
+  if (mode === "rec") {
+    if (recClass !== "noise" && takeHits >= TAKE_MAX_HITS) return;
+    data[recClass].push({ s: recSession, clip }); p.m.cls = recClass;
+    if (recClass !== "noise") takeHits++;
+    renderTeachProgress(); return;
+  }
+  if ((mode !== "control" && mode !== "music") || !model) return;
+  const t0 = performance.now(), feat = clipFeatures(clip), r = model.predict(feat), ms = performance.now() - t0;
+  const latency = (end - p.o) / SR * 1000 + ms;
+  let did = "", acted = false;
+  if (mode === "music") {
+    acted = r.label !== "noise" && r.conf >= thrMusic && !!SOUND_MAP[r.label];
+    if (acted) { playSound(SOUND_MAP[r.label], 0.5 + 0.5 * r.conf); did = DRUM_NAMES[SOUND_MAP[r.label]]; flash(`.drum[data-c="${r.label}"]`); }
+    else did = r.label === "noise" ? "Ignored: everyday noise" : "Ignored: not sure enough";
+  } else {
+    const action = scanOn ? (SCAN[scanIdx] || "none") : (actionMap[r.label] || "none"), now = performance.now();
+    const speaking = window.speechSynthesis && speechSynthesis.speaking;
+    let why = "";
+    if (r.label === "noise") why = "Ignored: everyday noise";
+    else if (r.conf < thrCtl) why = "Ignored: not sure enough";
+    else if (action === "none") why = "Nothing set for this sound";
+    else if (now - lastActionAt < 250) why = "Ignored: too soon after the last one";
+    else if (speaking && action !== "toggle") why = "Ignored while reading aloud";
+    else if (!listening && action !== "toggle") why = "Paused. Make your pause sound to resume";
+    if (!why && scanOn && now - lastActionAt < 900) why = "Ignored: too soon after the last one";
+    if (!why) { acted = true; lastActionAt = now; did = doAction(action); flash(`.cheat li[data-c="${r.label}"]`); if (scanOn) scanChosen(); } else did = why;
+  }
+  p.m.cls = acted ? r.label : "ignored";
+  hitCount++;
+  showHit({ label: r.label, conf: r.conf, latency, acted, did, feat });
+}
+
+function doAction(a) {
+  if (a === "toggle") { listening = !listening; renderListen(); beep(listening); return listening ? "Listening again" : "Paused"; }
+  beep(true);
+  if (a === "next") { setCard(cardIdx + 1); return "→ Next card"; }
+  if (a === "previous") { setCard(cardIdx - 1); return "← Previous card"; }
+  if (a === "start") { setCard(0); return "Back to the first card"; }
+  if (a === "read") { readCard(); return "Reading the card aloud"; }
+  return "";
+}
+
+function showHit(ev) {
+  const H = $("heard"), name = (SOUNDS[ev.label] || {}).name || ev.label;
+  H.classList.toggle("acted", ev.acted);
+  $("heardSound").textContent = name; $("heardSound").style.color = ev.acted ? css("--c-" + ev.label) : "";
+  $("heardDid").textContent = ev.did;
+  $("lastConf").textContent = ev.conf.toFixed(2);
+  $("lastLat").textContent = Math.round(ev.latency) + " ms";
+  $("hitCount").textContent = hitCount;
+  drawHeat(ev.feat);
+  const li = document.createElement("li"); if (!ev.acted) li.className = "ignored";
+  li.style.setProperty("--c", css("--c-" + ev.label));
+  li.innerHTML = `<span><span class="dot"></span>${ev.label}</span><span class="barc"><i style="width:${Math.round(ev.conf * 100)}%"></i></span><span>${ev.conf.toFixed(2)}</span><span class="act">${ev.did} · ${Math.round(ev.latency)} ms</span>`;
+  const log = $("log"); log.prepend(li); while (log.children.length > 40) log.lastChild.remove();
+}
+function flash(sel) { const el = document.querySelector(sel); if (!el) return; el.classList.add("flash"); setTimeout(() => el.classList.remove("flash"), 180); }
+
+// --- Steps ---
+function goStep(s) {
+  if (mode === "control" || mode === "music") stopUse();
+  for (const k of ["teach", "check", "use"]) { $("stage-" + k).hidden = k !== s; $("go-" + k).toggleAttribute("aria-current", k === s); if (k === s) $("go-" + k).setAttribute("aria-current", "step"); }
+  if (s === "check") renderCheck();
+  if (s === "use") renderUse();
+  $("go-" + s).scrollIntoView({ block: "nearest" });
+}
+$("go-teach").addEventListener("click", () => goStep("teach"));
+$("go-check").addEventListener("click", () => goStep("check"));
+$("go-use").addEventListener("click", () => { if (model) goStep("use"); else { goStep("check"); } });
+
+// --- Step 1: Teach ---
+const ORDER = CLASSES;   // pop, click, hiss, hum, tap, noise
+function renderChips() {
+  $("soundChips").innerHTML = ORDER.map((c, i) => {
+    const n = data[c].length, ok = n >= TARGET;
+    return `<button class="schip${ok ? " ok" : ""}" role="tab" aria-selected="${i === soundIdx}" data-i="${i}" style="--c:var(--c-${c})"><span class="d"></span>${SOUNDS[c].name}<span class="n">${ok ? "✓" : skipped.has(c) ? "skipped" : n}</span></button>`;
+  }).join("");
+}
+$("soundChips").addEventListener("click", e => { const b = e.target.closest("button"); if (!b || mode === "rec" || mode === "countdown") return; soundIdx = +b.dataset.i; renderTeach(); });
+function renderTeach() {
+  const c = ORDER[soundIdx], S = SOUNDS[c];
+  $("teachCard").style.setProperty("--c", `var(--c-${c})`);
+  $("tcCount").textContent = `Sound ${soundIdx + 1} of ${ORDER.length}`;
+  $("tcName").textContent = S.name; $("tcHow").textContent = S.how; $("tcTip").textContent = S.tip;
+  $("recLabel").textContent = data[c].length ? "Record again" : "Record";
+  $("tcFeedback").textContent = ""; $("tcFeedback").className = "tc-feedback";
+  $("nextSoundBtn").textContent = soundIdx === ORDER.length - 1 ? "Check what it learned →" : "Next sound →";
+  $("skipBtn").hidden = c === "noise";
+  renderTeachProgress(); renderChips(); renderDots(0);
+}
+function renderTeachProgress() {
+  const c = ORDER[soundIdx], n = data[c].length;
+  $("tcBar").style.width = Math.min(100, n / TARGET * 100) + "%";
+  $("tcHave").textContent = n >= TARGET ? `${n} examples. That's enough ✓` : `${n} of ${TARGET} examples`;
+  $("undoBtn").disabled = n === 0 || mode === "rec" || mode === "countdown";
+  if (mode === "rec") renderDots(recClass === "noise" ? Math.min(TAKE_MAX_HITS, Math.round((performance.now() - (recUntil - NOISE_SECONDS * 1000)) / (NOISE_SECONDS * 1000) * TAKE_MAX_HITS)) : takeHits);
+  renderChips();
+}
+function renderDots(k) { $("dots").innerHTML = Array.from({ length: TAKE_MAX_HITS }, (_, i) => `<i class="${i < k ? "on" : ""}"></i>`).join(""); }
+
+let takeResolve = null;
+$("recBtn").addEventListener("click", async () => {
+  if (mode === "rec") { finishRecording(); return; }
+  if (mode === "countdown") return;
+  startTake();
+});
+async function startTake() {
+  if (!(await startMic())) return Promise.resolve(-1);
+  const c = ORDER[soundIdx];
+  const done = new Promise(r => { takeResolve = r; });
+  recClass = c; recSession = `${($("who").value || "me").replace(/[^a-z0-9-]/gi, "")}-web${Date.now().toString(36)}`;
+  takeHits = 0; mode = "countdown"; renderDots(0);
+  const btn = $("recBtn"); btn.className = "recbig counting"; $("undoBtn").disabled = true;
+  $("tcFeedback").textContent = "Get ready…"; $("tcFeedback").className = "tc-feedback";
+  let n = 3; $("recLabel").textContent = n;
+  const iv = setInterval(() => {
+    n--; if (n > 0) { $("recLabel").textContent = n; return; }
+    clearInterval(iv);
+    mode = "rec"; recStart = det.seen; lastNoiseWin = det.seen;
+    recUntil = performance.now() + (c === "noise" ? NOISE_SECONDS : TAKE_SECONDS) * 1000;
+    btn.className = "recbig recording"; $("recLabel").textContent = "Stop"; setMicDot("rec");
+    $("tcFeedback").textContent = c === "noise" ? "Talk, breathe and type normally…" : "Go! Each dot is one sound heard.";
+    setStatus(`Recording ${SOUNDS[c].name.toLowerCase()}…`);
+    tickNoiseDots();
+  }, 700);
+  return done;
+}
+function tickNoiseDots() { if (mode !== "rec") return; if (recClass === "noise") renderTeachProgress(); requestAnimationFrame(tickNoiseDots); }
+function finishRecording() {
+  if (mode !== "rec") return;
+  const c = recClass, got = data[c].filter(x => x.s === recSession).length;
+  mode = "idle"; recClass = null; save(); setMicDot("on");
+  $("recBtn").className = "recbig"; $("recLabel").textContent = "Record again";
+  const fb = $("tcFeedback"), total = data[c].length;
+  if (c !== "noise" && got < 5) { fb.textContent = `It heard ${got}. No problem: try a little closer to the laptop. Soft is fine, it just needs to hear you.`; fb.className = "tc-feedback warn"; }
+  else if (total >= TARGET) { fb.textContent = `Great, ${got} added. You have enough. Press “${soundIdx === ORDER.length - 1 ? "Check what it learned" : "Next sound"}”.`; fb.className = "tc-feedback good"; }
+  else { fb.textContent = `Nice, ${got} added. It\u2019s learning your sound. Record once more, a little further away or quieter.`; fb.className = "tc-feedback good"; }
+  setStatus("Microphone is on. Nothing leaves this computer.");
+  renderTeachProgress(); retrain(); renderLauncher();
+  if (takeResolve) { const r = takeResolve; takeResolve = null; r(got); }
+}
+$("undoBtn").addEventListener("click", () => {
+  const c = ORDER[soundIdx]; if (!data[c].length) return;
+  const last = data[c].at(-1).s; data[c] = data[c].filter(x => x.s !== last); save(); retrain(); renderTeach();
+  $("tcFeedback").textContent = "Last recording removed.";
+});
+$("skipBtn").addEventListener("click", () => { skipped.add(ORDER[soundIdx]); nextSound(); });
+$("nextSoundBtn").addEventListener("click", nextSound);
+function nextSound() { if (soundIdx < ORDER.length - 1) { soundIdx++; renderTeach(); } else goStep("check"); }
+
+// --- Training + Step 2: Check ---
+let lastResults = null;
+function retrain() {
+  const items = [];
+  for (const c of CLASSES) for (const x of data[c]) items.push({ feat: x.feat || (x.feat = clipFeatures(x.clip)), label: c });
+  const usable = CLASSES.filter(c => data[c].length >= 3);
+  $("exportBtn").disabled = items.length === 0;
+  const ready = usable.length >= 2 && usable.some(c => c !== "noise");
+  $("toUseBtn").disabled = !ready;
+  $("go-teach").classList.toggle("done", ready);
+  if (!ready) { model = null; lastResults = null; return; }
+  model = new KNN(items.filter(it => usable.includes(it.label)));
+  const res = model.leaveOneOut();
+  lastResults = { usable, res, acc: res.filter(r => r.truth === r.label).length / res.length };
+  $("go-check").classList.toggle("done", lastResults.acc >= 0.85);
+}
+function renderCheck() {
+  if (!lastResults) {
+    $("scoreNum").textContent = "–"; $("scoreRing").style.setProperty("--p", 0);
+    $("scoreWords").textContent = "Record some sounds first"; $("scoreSub").textContent = "It needs one of your sounds plus everyday noise, with 3 or more examples each.";
+    $("checkList").innerHTML = ""; return;
+  }
+  const { usable, res, acc } = lastResults, pct = Math.round(acc * 100);
+  $("scoreNum").textContent = pct + "%"; $("scoreRing").style.setProperty("--p", pct);
+  $("scoreWords").textContent = pct >= 90 ? "It knows your voice now" : pct >= 75 ? "Almost there" : "It\u2019s still learning your voice";
+  $("scoreSub").textContent = `It recognised ${pct}% of your examples when tested on ones it hadn't seen.`;
+  const rows = usable.map(c => {
+    const mine = res.filter(r => r.truth === c), a = mine.filter(r => r.label === c).length / mine.length;
+    const wrong = {}; mine.filter(r => r.label !== c).forEach(r => wrong[r.label] = (wrong[r.label] || 0) + 1);
+    const top = Object.entries(wrong).sort((x, y) => y[1] - x[1])[0];
+    const cls = a >= 0.9 ? "good" : a >= 0.7 ? "mid" : "bad";
+    let msg = a >= 0.9 ? "Works well" : top ? `Sometimes mixed up with ${SOUNDS[top[0]].name.toLowerCase()}` : "Needs more examples";
+    if (c === "noise" && a >= 0.9) msg = "Ignores everyday noise well";
+    const btn = a < 0.9 || mine.length < 10 ? `<button class="small" data-fix="${c}">Record more</button>` : `<span aria-hidden="true">✓</span>`;
+    return `<div class="crow ${cls}" style="--c:var(--c-${c})"><span class="cname"><span class="d"></span>${SOUNDS[c].name}</span><span class="cbar"><span class="track"><i style="width:${Math.round(a * 100)}%"></i></span><small>${msg} (${Math.round(a * 100)}%)</small></span>${btn}</div>`;
+  });
+  const missing = CLASSES.filter(c => !usable.includes(c));
+  if (missing.includes("noise")) rows.push(`<div class="crow bad" style="--c:var(--c-noise)"><span class="cname"><span class="d"></span>Everyday noise</span><span class="cbar"><small>Not recorded yet. Without it, talking could trigger actions.</small></span><button class="small" data-fix="noise">Record</button></div>`);
+  $("checkList").innerHTML = rows.join("");
+}
+$("checkList").addEventListener("click", e => { const b = e.target.closest("button[data-fix]"); if (!b) return; soundIdx = ORDER.indexOf(b.dataset.fix); goStep("teach"); renderTeach(); });
+$("backTeachBtn").addEventListener("click", () => goStep("teach"));
+$("toUseBtn").addEventListener("click", () => goStep("use"));
+
+// --- Step 3: Use ---
+function renderUse() {
+  const trained = c => lastResults && lastResults.usable.includes(c);
+  const mine = Object.keys(DEFAULT_MAP).filter(trained);
+  $("cheatList").innerHTML = (mine.map(c => `<li data-c="${c}" style="--c:var(--c-${c})"><span class="d"></span><b>${SOUNDS[c].name}</b><span>${ACTIONS[actionMap[c]]}</span></li>`).join("") || "<li>Record some sounds first.</li>")
+    + (mine.length === 1 ? `<li class="tipli">Only one sound? Turn on <b>one-sound mode</b> above to use every action.</li>` : "");
+  $("drumGrid").innerHTML = Object.keys(SOUND_MAP).filter(trained).map(c => `<div class="drum" data-c="${c}" style="--c:var(--c-${c})"><b>${DRUM_NAMES[SOUND_MAP[c]]}</b><span>${SOUNDS[c].name}</span></div>`).join("");
+}
+function setUseMode(m) {
+  if (mode === "control" || mode === "music") stopUse();
+  useMode = m;
+  $("tabControl").setAttribute("aria-selected", m === "control"); $("tabMusic").setAttribute("aria-selected", m === "music");
+  $("paneControl").hidden = m !== "control"; $("paneMusic").hidden = m !== "music";
+}
+$("tabControl").addEventListener("click", () => setUseMode("control"));
+$("tabMusic").addEventListener("click", () => setUseMode("music"));
+function stopUse() { mode = "idle"; $("startBtn").textContent = "Start listening"; $("startBtn").classList.remove("on"); renderListen(); $("heardDid").textContent = "Stopped. Press Start to listen again."; }
+$("startBtn").addEventListener("click", async () => {
+  if (mode === "control" || mode === "music") { stopUse(); return; }
+  await startListening();
+});
+function renderListen() {
+  const p = $("listenPill"); p.hidden = mode !== "control";
+  p.textContent = listening ? "Listening" : "Paused: make your pause sound to resume"; p.classList.toggle("paused", !listening);
+}
+
+// Reader
+function setCard(i) {
+  cardIdx = Math.max(0, Math.min(CARDS.length - 1, i));
+  const c = CARDS[cardIdx], el = $("card");
+  el.innerHTML = `<div class="kicker">${c.k}</div><h4>${c.h}</h4><p>${c.p}</p>${c.s ? `<div class="src">Source: ${c.s}</div>` : ""}`;
+  $("cardPos").textContent = `${cardIdx + 1} / ${CARDS.length}`;
+  $("celebrate").hidden = !(cardIdx === CARDS.length - 1 && mode === "control");
+  el.classList.add("bump"); setTimeout(() => el.classList.remove("bump"), 180);
+}
+function readCard() {
+  if (!window.speechSynthesis) return;
+  speechSynthesis.cancel();
+  const c = CARDS[cardIdx]; speechSynthesis.speak(new SpeechSynthesisUtterance(`${c.h} ${c.p}`));
+}
+$("prevBtn").addEventListener("click", () => setCard(cardIdx - 1));
+$("nextBtn").addEventListener("click", () => setCard(cardIdx + 1));
+
+// Advanced: action mapping
+function renderMap() {
+  $("mapRows").innerHTML = Object.keys(DEFAULT_MAP).map(c => `<tr style="--c:var(--c-${c})"><td><span class="dot"></span><label for="map-${c}">${SOUNDS[c].name}</label></td><td><select id="map-${c}" data-c="${c}">${Object.entries(ACTIONS).map(([k, v]) => `<option value="${k}"${actionMap[c] === k ? " selected" : ""}>${v}</option>`).join("")}</select></td></tr>`).join("");
+}
+$("mapRows").addEventListener("change", e => { const c = e.target.dataset.c; if (!c) return; actionMap[c] = e.target.value; try { localStorage.setItem("alch-map", JSON.stringify(actionMap)); } catch (x) { } renderUse(); });
+
+// --- Drawing ---
+function fitCanvas(cv) { const r = cv.getBoundingClientRect(), d = window.devicePixelRatio || 1; if (r.width && cv.width !== Math.round(r.width * d)) { cv.width = Math.round(r.width * d); cv.height = Math.round(r.height * d); } return d; }
+function draw() {
+  if (micOn) $("lvl").style.width = Math.min(100, Math.max(0, (20 * Math.log10(det.lastRms) + 60) / 60 * 100)) + "%";
+  const cv = $("scope");
+  if (cv.getBoundingClientRect().width) {
+    const d = fitCanvas(cv), g = cv.getContext("2d"), W = cv.width, H = cv.height;
+    g.fillStyle = css("--scope-bg"); g.fillRect(0, 0, W, H);
+    if (micOn) {
+      const endS = det.seen, per = RING / W;
+      g.strokeStyle = css("--scope-wave"); g.lineWidth = 1; g.beginPath();
+      for (let x = 0; x < W; x++) {
+        const a = Math.floor(endS - RING + x * per), b = Math.floor(a + per); let mn = 0, mx = 0;
+        for (let i = Math.max(a, 0); i < b; i++) { const v = ring[i % RING]; if (v < mn) mn = v; if (v > mx) mx = v; }
+        const k = 0.48 * H * 2.2; g.moveTo(x + 0.5, H / 2 - Math.min(mx * k, H / 2)); g.lineTo(x + 0.5, H / 2 - Math.max(mn * k, -H / 2));
+      }
+      g.stroke();
+      markers = markers.filter(m => endS - m.t < RING);
+      for (const m of markers) {
+        const x = W - (endS - m.t) / RING * W;
+        g.fillStyle = m.cls && m.cls !== "ignored" ? css("--c-" + m.cls) : m.cls === "ignored" ? "#6c757d" : "#ffffff";
+        g.fillRect(x, 0, 2 * d, H);
+      }
+    }
+  }
+  requestAnimationFrame(draw);
+}
+function drawHeat(feat) {
+  const cv = $("heat"), g = cv.getContext("2d"), img = g.createImageData(NFRAMES, NMELS);
+  let mn = Infinity, mx = -Infinity; for (const v of feat) { if (v < mn) mn = v; if (v > mx) mx = v; }
+  const stops = [[16, 21, 29], [42, 52, 110], [140, 50, 140], [235, 100, 60], [250, 220, 90]];
+  for (let m = 0; m < NMELS; m++) for (let t = 0; t < NFRAMES; t++) {
+    const v = (feat[m * NFRAMES + t] - mn) / (mx - mn + 1e-9), p = v * (stops.length - 1), i = Math.min(Math.floor(p), stops.length - 2), f = p - i;
+    const o = ((NMELS - 1 - m) * NFRAMES + t) * 4;
+    for (let k = 0; k < 3; k++) img.data[o + k] = stops[i][k] * (1 - f) + stops[i + 1][k] * f;
+    img.data[o + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+}
+
+// --- Export ---
+function wav16(f32) {
+  const n = f32.length, buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf), w = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  w(0, "RIFF"); v.setUint32(4, 36 + n * 2, true); w(8, "WAVE"); w(12, "fmt "); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, SR, true); v.setUint32(28, SR * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, "data"); v.setUint32(40, n * 2, true);
+  for (let i = 0; i < n; i++) v.setInt16(44 + i * 2, Math.max(-1, Math.min(1, f32[i])) * 32767, true);
+  return buf;
+}
+$("exportBtn").addEventListener("click", async () => {
+  if (!window.JSZip) { $("exportStatus").textContent = "The zip library didn't load. Check your internet connection and reload."; return; }
+  const zip = new JSZip(); let n = 0;
+  for (const c of CLASSES) { const idx = {}; for (const x of data[c]) { idx[x.s] = (idx[x.s] || 0) + 1; zip.file(`data/${c}/${x.s}__${String(idx[x.s] - 1).padStart(3, "0")}.wav`, wav16(x.clip)); n++; } }
+  const blob = await zip.generateAsync({ type: "blob" }), a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = "data.zip"; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  $("exportStatus").textContent = `Downloaded ${n} recordings.`;
+});
+let wipeArmed = false;
+$("wipeBtn").addEventListener("click", () => {
+  if (!wipeArmed) { wipeArmed = true; $("wipeBtn").textContent = "Click again to delete"; setTimeout(() => { wipeArmed = false; $("wipeBtn").textContent = "Delete all recordings"; }, 3000); return; }
+  wipeArmed = false; $("wipeBtn").textContent = "Delete all recordings";
+  data = Object.fromEntries(CLASSES.map(c => [c, []])); save(); retrain(); soundIdx = 0; renderTeach(); $("exportStatus").textContent = "All recordings deleted.";
+});
+
+// --- Settings ---
+$("sens").addEventListener("input", e => { det.sensitivity = +e.target.value; $("sensVal").textContent = (+e.target.value).toFixed(1); });
+$("thrCtl").addEventListener("input", e => { thrCtl = +e.target.value; $("thrCtlVal").textContent = thrCtl.toFixed(2); });
+$("thrMusic").addEventListener("input", e => { thrMusic = +e.target.value; $("thrMusicVal").textContent = thrMusic.toFixed(2); });
+if (location.protocol === "file:" || !window.isSecureContext) $("secureNote").hidden = false;
+
+// --- Easy start: launcher, spoken guide, one-sound mode, shortcuts, bigger text ---
+const QUICK = ["pop", "noise"], FULL = ["pop", "click", "hiss", "hum", "tap", "noise"];
+let guideOn = false, guideAbort = false;
+function renderLauncher() {
+  const back = !!model && !guideOn;
+  $("launchBack").hidden = !back; $("launchNew").hidden = back;
+}
+function speakOn() { return $("speakToggle").checked && "speechSynthesis" in window; }
+function say(text) {
+  $("guideText").textContent = text;
+  if (!speakOn()) return new Promise(r => setTimeout(r, 900 + 35 * text.length));
+  return new Promise(res => {
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text); u.rate = 0.95;
+    let done = false; const fin = () => { if (!done) { done = true; setTimeout(res, 250); } };
+    u.onend = fin; u.onerror = fin; setTimeout(fin, 1500 + 90 * text.length);
+    speechSynthesis.speak(u);
+  });
+}
+async function runGuide(list) {
+  guideOn = true; guideAbort = false;
+  $("launcher").hidden = true; $("guide").hidden = false;
+  goStep("teach");
+  $("guideStep").textContent = "Guided setup";
+  await say("Hello. I'll guide you. First, please allow the microphone if your browser asks.");
+  if (!(await startMic())) { endGuide("The microphone isn't available. See the message above."); return; }
+  for (let i = 0; i < list.length && !guideAbort; i++) {
+    const c = list[i], S = SOUNDS[c];
+    soundIdx = ORDER.indexOf(c); renderTeach();
+    $("guideStep").textContent = `Sound ${i + 1} of ${list.length}: ${S.name}`;
+    let takes = 0, retries = 0;
+    while (takes < 2 && !guideAbort) {
+      if (takes === 0 && retries === 0) await say(c === "noise"
+        ? "Last one. For eight seconds, just talk, breathe or type normally. This teaches it what to ignore. Starting after the countdown."
+        : `${S.name}. ${S.how} Do it about ten times, with a short pause between each. Starting after the countdown.`);
+      else if (retries === 0) await say(c === "noise" ? "" : "Lovely. Once more, a little further away, or a little quieter.");
+      if (guideAbort) break;
+      $("guideText").textContent = c === "noise" ? "Talk, breathe or type normally…" : `Now: ${S.name.toLowerCase()}, about ten times…`;
+      const got = await startTake();
+      if (got < 0 || guideAbort) break;
+      if (c !== "noise" && got < 5) {
+        if (retries < 1) { retries++; await say("I only heard a few. That's okay. Try a little closer to the laptop. Soft is fine."); continue; }
+        await say("That's alright. We'll skip this sound. You can always come back to it."); skipped.add(c); break;
+      }
+      takes++; retries = 0;
+      if (c === "noise") break;
+    }
+  }
+  if (guideAbort) { endGuide(); return; }
+  retrain(); goStep("check");
+  if (!model) { await say("I need a little more to work with. Let's record your lip pop again."); endGuide(); goStep("teach"); return; }
+  const pct = Math.round(lastResults.acc * 100);
+  $("guideStep").textContent = "Checking";
+  await say(pct >= 75 ? `Done. It recognised ${pct} percent of your sounds.` : `It recognised ${pct} percent. That's a start, and recording a little more later will help.`);
+  if (guideAbort) { endGuide(); return; }
+  goStep("use"); setUseMode("control");
+  await startListening();
+  const first = Object.keys(actionMap).find(k => lastResults.usable.includes(k) && actionMap[k] === "next");
+  await say(first ? `You're ready. Make your ${SOUNDS[first].name.toLowerCase()} to turn the page.` : "You're ready. Make one of your sounds.");
+  endGuide();
+}
+function endGuide(msg) {
+  guideOn = false; $("guide").hidden = true; $("launcher").hidden = false; renderLauncher();
+  if (msg) setStatus(msg, true);
+}
+$("guideStop").addEventListener("click", stopGuide);
+function stopGuide() {
+  if (!guideOn) return;
+  guideAbort = true; if ("speechSynthesis" in window) speechSynthesis.cancel();
+  if (mode === "rec") finishRecording();
+  endGuide();
+}
+$("quickBtn").addEventListener("click", () => runGuide(QUICK));
+$("fullBtn").addEventListener("click", () => runGuide(FULL));
+$("redoBtn").addEventListener("click", () => runGuide(QUICK));
+$("resumeBtn").addEventListener("click", async () => { goStep("use"); setUseMode("control"); await startListening(); });
+$("speakToggle").addEventListener("change", () => { try { localStorage.setItem("alch-speak", $("speakToggle").checked ? "1" : "0"); } catch (e) { } });
+$("bigTextBtn").addEventListener("click", () => {
+  const on = !document.body.classList.contains("bigtext"); document.body.classList.toggle("bigtext", on);
+  $("bigTextBtn").setAttribute("aria-pressed", on); try { localStorage.setItem("alch-big", on ? "1" : "0"); } catch (e) { }
+});
+try { if (localStorage.getItem("alch-speak") === "0") $("speakToggle").checked = false; if (localStorage.getItem("alch-big") === "1") { document.body.classList.add("bigtext"); $("bigTextBtn").setAttribute("aria-pressed", "true"); } } catch (e) { }
+
+async function startListening() {
+  if (!model) { goStep("check"); return; }
+  if (!(await startMic())) return;
+  mode = useMode; listening = true;
+  $("startBtn").textContent = "Stop"; $("startBtn").classList.add("on");
+  $("heardDid").textContent = useMode === "control" ? (scanOn ? "Listening. Make any of your sounds when the option you want lights up." : "Listening. Make your pop sound to turn the page.") : "Listening. Make your sounds to play the drums.";
+  renderListen();
+}
+
+// One-sound (scanning) mode
+const SCAN = ["next", "previous", "read", "start"];
+let scanOn = false, scanIdx = 0, scanTimer = null;
+function renderScan() {
+  document.querySelectorAll(".scanopt").forEach((el, i) => el.classList.toggle("lit", scanOn && i === scanIdx));
+}
+function scanTick() {
+  const speaking = "speechSynthesis" in window && speechSynthesis.speaking;
+  if (mode === "control" && scanOn && listening && !speaking && performance.now() - lastActionAt > 900) { scanIdx = (scanIdx + 1) % SCAN.length; renderScan(); }
+}
+function scanChosen() {
+  const el = document.querySelectorAll(".scanopt")[scanIdx]; if (!el) return;
+  el.classList.add("chosen"); setTimeout(() => el.classList.remove("chosen"), 400);
+}
+$("scanToggle").addEventListener("change", () => {
+  scanOn = $("scanToggle").checked; $("scanRow").hidden = !scanOn; scanIdx = 0; renderScan();
+  clearInterval(scanTimer); if (scanOn) scanTimer = setInterval(scanTick, 1600);
+  if (mode === "control") startListening();
+});
+
+// Keyboard shortcuts for a helper
+document.addEventListener("keydown", e => {
+  if (e.target.closest("input[type=text], select, textarea") || e.metaKey || e.ctrlKey || e.altKey) return;
+  const teach = !$("stage-teach").hidden, use = !$("stage-use").hidden;
+  if (e.key === "Escape") { stopGuide(); return; }
+  if (guideOn) return;
+  if (e.key === " " && teach && !e.target.closest("button")) { e.preventDefault(); $("recBtn").click(); }
+  else if (e.key === "ArrowRight" && teach) { e.preventDefault(); nextSound(); }
+  else if ((e.key === "s" || e.key === "S") && use) { e.preventDefault(); $("startBtn").click(); }
+});
+
+// --- Opening: a quiet, breathing sound wave ---
+(function breath() {
+  const cv = $("breath"); if (!cv) return;
+  const still = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  function frame(t) {
+    const r = cv.getBoundingClientRect(), d = window.devicePixelRatio || 1;
+    if (cv.width !== Math.round(r.width * d) || cv.height !== Math.round(r.height * d)) { cv.width = Math.round(r.width * d); cv.height = Math.round(r.height * d); }
+    const g = cv.getContext("2d"), W = cv.width, H = cv.height; g.clearRect(0, 0, W, H);
+    const live = micOn ? Math.min(1, det.lastRms * 12) : 0;
+    for (let k = 0; k < 3; k++) {
+      g.beginPath(); g.lineWidth = (1.5 - k * 0.4) * d; g.strokeStyle = `rgba(95,212,228,${0.55 - k * 0.15})`;
+      const amp = H * (0.06 + 0.03 * Math.sin(t / 1800 + k) + live * 0.2), y0 = H * (0.72 + k * 0.05);
+      for (let x = 0; x <= W; x += 4 * d) {
+        const u = x / W, env = Math.sin(Math.PI * u);
+        const y = y0 + Math.sin(u * 14 + t / (900 + k * 300) + k) * amp * env * (0.6 + 0.4 * Math.sin(u * 3 + t / 2400));
+        x ? g.lineTo(x, y) : g.moveTo(x, y);
+      }
+      g.stroke();
+    }
+    if (!still) requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+
+load();
+soundIdx = Math.max(0, ORDER.findIndex(c => data[c].length < TARGET && c !== "noise")); if (soundIdx < 0) soundIdx = 0;
+retrain(); renderTeach(); renderMap(); renderUse(); renderLauncher(); setCard(0); drawHeat(new Float32Array(NFEAT)); draw();
+</script>
+</body>
+</html>
