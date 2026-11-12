@@ -6,7 +6,7 @@
 
 **Live demo:** https://akshataa369.github.io/acoustic-alchemist/ (open in Chrome and allow the microphone)
 
-Built by **Team Winners** (Akshata Sinha, Pratishtha) for *Hack on Holiday 2026*, Reinforce Club, Scaler School of Technology.
+Built by **Team Winners** for *Hack on Holiday 2026*, Reinforce Club, Scaler School of Technology.
 Problem statement: *"Acoustic-Alchemist": Non-Verbal Audio & Environmental Trigger System*.
 
 ---
